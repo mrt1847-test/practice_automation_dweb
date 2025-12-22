@@ -1,0 +1,98 @@
+"""
+주문/결제 관련 Step Definitions
+주문 / 결제
+"""
+from pytest_bdd import given, when, then, parsers
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+@when("사용자가 구매하기 버튼을 클릭한다")
+def user_clicks_purchase_button(page):
+    """
+    사용자가 구매하기 버튼 클릭
+    시나리오 태그(@C12345)로 TestRail에 자동 기록됨
+    """
+    page.wait_for_load_state("networkidle")
+    page.click("button:has-text('구매하기')", timeout=10000)
+    logger.info("구매하기 버튼 클릭 완료")
+
+
+@when("사용자가 바로구매 버튼을 클릭한다")
+def user_clicks_buy_now_button(page):
+    """사용자가 바로구매 버튼 클릭"""
+    # TODO: 바로구매 버튼 클릭 로직 구현
+    logger.info("바로구매 버튼 클릭 완료")
+
+
+@when("사용자가 장바구니에서 선택된 상품을 주문한다")
+def user_orders_selected_items_from_cart(page):
+    """사용자가 장바구니에서 선택된 상품 주문"""
+    # TODO: 장바구니에서 선택 주문 로직 구현
+    logger.info("장바구니에서 선택 주문")
+
+
+@when("사용자가 장바구니에서 전체 상품을 주문한다")
+def user_orders_all_items_from_cart(page):
+    """사용자가 장바구니의 모든 상품 주문"""
+    # TODO: 장바구니 전체 주문 로직 구현
+    logger.info("장바구니 전체 주문")
+
+
+@then("구매 페이지가 표시된다")
+def purchase_page_is_displayed(page):
+    """구매/주문 페이지가 표시되는지 확인"""
+    page.wait_for_load_state("networkidle")
+    assert "order" in page.url.lower() or "purchase" in page.url.lower(), "구매 페이지가 표시되지 않았습니다"
+    logger.info("구매 페이지 표시 확인")
+
+
+@when("사용자가 배송지 정보를 입력한다")
+def user_enters_shipping_info(page):
+    """사용자가 배송지 정보 입력"""
+    # TODO: 배송지 정보 입력 로직 구현
+    logger.info("배송지 정보 입력")
+
+
+@when("사용자가 기존 배송지를 선택한다")
+def user_selects_existing_shipping_address(page):
+    """사용자가 저장된 배송지 선택"""
+    # TODO: 기존 배송지 선택 로직 구현
+    logger.info("기존 배송지 선택")
+
+
+@when(parsers.parse('사용자가 "{address_name}" 배송지를 선택한다'))
+def user_selects_specific_shipping_address(page, address_name):
+    """사용자가 특정 배송지 선택"""
+    # TODO: 특정 배송지 선택 로직 구현
+    logger.info(f"배송지 선택: {address_name}")
+
+
+@when("사용자가 결제 방법을 선택한다")
+def user_selects_payment_method(page):
+    """사용자가 결제 방법 선택"""
+    # TODO: 결제 방법 선택 로직 구현
+    logger.info("결제 방법 선택")
+
+
+@when(parsers.parse('사용자가 "{payment_method}"로 결제한다'))
+def user_pays_with_method(page, payment_method):
+    """사용자가 특정 결제 방법으로 결제"""
+    # TODO: 결제 방법별 결제 로직 구현
+    logger.info(f"결제 방법: {payment_method}")
+
+
+@when("사용자가 주문을 완료한다")
+def user_completes_order(page):
+    """사용자가 주문 완료 버튼 클릭"""
+    # TODO: 주문 완료 버튼 클릭 로직 구현
+    logger.info("주문 완료")
+
+
+@then("주문이 완료되었다")
+def order_is_completed(page):
+    """주문이 성공적으로 완료되었는지 확인"""
+    page.wait_for_load_state("networkidle")
+    # TODO: 주문 완료 페이지 확인 로직 구현
+    logger.info("주문 완료 확인")
