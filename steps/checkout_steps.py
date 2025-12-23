@@ -3,6 +3,10 @@
 주문 / 결제
 """
 from pytest_bdd import given, when, then, parsers
+from pages.cart_page import CartPage
+from pages.product_page import ProductPage
+from pages.search_page import SearchPage
+from pages.home_page import HomePage
 import logging
 
 logger = logging.getLogger(__name__)
@@ -42,10 +46,51 @@ def user_orders_all_items_from_cart(page):
 
 @then("구매 페이지가 표시된다")
 def purchase_page_is_displayed(page):
-    """구매/주문 페이지가 표시되는지 확인"""
+    """구매/주문 페이지가 표시되는지 확인 (증명)"""
     page.wait_for_load_state("networkidle")
     assert "order" in page.url.lower() or "purchase" in page.url.lower(), "구매 페이지가 표시되지 않았습니다"
     logger.info("구매 페이지 표시 확인")
+
+
+@given("구매 페이지가 표시된다")
+def purchase_page_is_displayed_given(page):
+    """구매 페이지 상태 보장 (확인 + 필요시 생성)"""
+    page.wait_for_load_state("networkidle")
+    
+    # 상태 확인
+    if "order" in page.url.lower() or "purchase" in page.url.lower():
+        logger.info("이미 구매 페이지에 있음")
+        return
+    
+    # 상태가 아니면 강제로 생성
+    logger.info("구매 페이지가 아님. 구매하기 버튼 클릭 수행")
+    
+    # 장바구니에 상품이 있는지 확인
+    cart_page = CartPage(page)
+    if not cart_page.has_products():
+        # 장바구니가 비어있으면 상품 추가부터 수행
+        logger.info("장바구니가 비어있음. 상품 추가 수행")
+        product_page = ProductPage(page)
+        if not product_page.is_product_detail_displayed():
+            # 상품 상세 페이지도 없으면 상품 선택부터 수행
+            logger.info("상품 상세 페이지가 아님. 상품 선택 수행")
+            search_page = SearchPage(page)
+            if not search_page.is_search_results_displayed():
+                # 검색 결과 페이지도 아니면 검색부터 수행
+                logger.info("검색 결과 페이지도 아님. 검색 수행")
+                home_page = HomePage(page)
+                home_page.search_product("노트북")
+            search_page.select_first_product()
+        product_page.add_to_cart()
+    
+    # 구매하기 버튼 클릭
+    page.wait_for_load_state("networkidle")
+    page.click("button:has-text('구매하기')", timeout=10000)
+    
+    # 생성 후 확인
+    page.wait_for_load_state("networkidle")
+    assert "order" in page.url.lower() or "purchase" in page.url.lower(), "구매 페이지 생성 실패"
+    logger.info("구매 페이지 상태 보장 완료")
 
 
 @when("사용자가 배송지 정보를 입력한다")

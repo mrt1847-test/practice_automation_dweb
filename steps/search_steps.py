@@ -4,6 +4,7 @@
 """
 from pytest_bdd import given, when, then, parsers
 from pages.home_page import HomePage
+from pages.search_page import SearchPage
 import logging
 
 logger = logging.getLogger(__name__)
@@ -31,35 +32,72 @@ def user_has_searched_product(page, keyword):
     logger.info(f"상품 검색 완료: {keyword}")
 
 
+@when("사용자가 첫 번째 상품을 선택한다")
+def user_selects_first_product(page):
+    """사용자가 첫 번째 상품을 선택"""
+    search_page = SearchPage(page)
+    search_page.select_first_product()
+    logger.info("첫 번째 상품 선택 완료")
+
+
+@when(parsers.parse('사용자가 "{product_name}" 상품을 선택한다'))
+def user_selects_product(page, product_name):
+    """사용자가 특정 상품을 선택"""
+    search_page = SearchPage(page)
+    search_page.select_product_by_name(product_name)
+    logger.info(f"상품 선택: {product_name}")
+
+
 @then("검색 결과 페이지가 표시된다")
 def search_results_page_is_displayed(page):
-    """검색 결과 페이지가 표시되는지 확인"""
-    page.wait_for_load_state("networkidle")
-    current_url = page.url
-    assert "search" in current_url.lower(), f"검색 결과 페이지가 아닙니다. 현재 URL: {current_url}"
+    """검색 결과 페이지가 표시되는지 확인 (증명)"""
+    search_page = SearchPage(page)
+    assert search_page.is_search_results_displayed(), "검색 결과 페이지가 표시되지 않았습니다"
     logger.info("검색 결과 페이지 표시 확인")
+
+
+@given("검색 결과 페이지가 표시된다")
+def search_results_page_is_displayed_given(page):
+    """검색 결과 페이지 상태 보장 (확인 + 필요시 생성)"""
+    search_page = SearchPage(page)
+    
+    # 상태 확인
+    if search_page.is_search_results_displayed():
+        logger.info("이미 검색 결과 페이지에 있음")
+        return
+    
+    # 상태가 아니면 강제로 생성
+    logger.info("검색 결과 페이지가 아님. 검색 수행")
+    home_page = HomePage(page)
+    # 기본 검색어 사용 (또는 설정에서 가져오기)
+    home_page.search_product("노트북")
+    
+    # 생성 후 확인
+    assert search_page.is_search_results_displayed(), "검색 결과 페이지 생성 실패"
+    logger.info("검색 결과 페이지 상태 보장 완료")
 
 
 @then(parsers.parse('검색 결과에 "{keyword}" 관련 상품이 포함되어 있다'))
 def search_results_contain_product(page, keyword):
     """검색 결과에 해당 키워드 관련 상품이 포함되어 있는지 확인"""
-    page.wait_for_load_state("networkidle")
-    page_content = page.content()
-    assert len(page_content) > 0, "검색 결과 페이지가 비어있습니다"
+    search_page = SearchPage(page)
+    assert search_page.contains_keyword(keyword), f"검색 결과에 '{keyword}' 관련 상품이 포함되어 있지 않습니다"
     logger.info(f"검색 결과에 '{keyword}' 관련 상품 포함 확인")
 
 
 @when("사용자가 검색 필터를 적용한다")
 def user_applies_search_filter(page):
     """사용자가 검색 결과에 필터를 적용"""
-    # TODO: 필터 적용 로직 구현
+    search_page = SearchPage(page)
+    search_page.apply_filter()
     logger.info("검색 필터 적용")
 
 
 @when("사용자가 정렬 기준을 선택한다")
 def user_selects_sort_option(page):
     """사용자가 검색 결과 정렬 기준 선택"""
-    # TODO: 정렬 기준 선택 로직 구현
+    search_page = SearchPage(page)
+    search_page.select_sort_option()
     logger.info("정렬 기준 선택")
 
 
