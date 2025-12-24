@@ -40,8 +40,9 @@ def product_detail_page_is_displayed_given(page):
         home_page = HomePage(page)
         home_page.search_product("노트북")
     
-    # 상품 선택
-    search_page.select_first_product()
+    # 상품 선택 (Atomic POM 조합)
+    search_page.wait_for_search_results_load()
+    search_page.click_first_product()
     
     # 생성 후 확인
     assert product_page.is_product_detail_displayed(), "상품 상세 페이지 생성 실패"

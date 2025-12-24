@@ -15,11 +15,12 @@ logger = logging.getLogger(__name__)
 @when("사용자가 구매하기 버튼을 클릭한다")
 def user_clicks_purchase_button(page):
     """
-    사용자가 구매하기 버튼 클릭
+    사용자가 구매하기 버튼 클릭 (POM 패턴 사용)
     시나리오 태그(@C12345)로 TestRail에 자동 기록됨
     """
-    page.wait_for_load_state("networkidle")
-    page.click("button:has-text('구매하기')", timeout=10000)
+    cart_page = CartPage(page)
+    cart_page.wait_for_page_load()
+    cart_page.click_purchase_button()
     logger.info("구매하기 버튼 클릭 완료")
 
 
@@ -79,13 +80,20 @@ def purchase_page_is_displayed_given(page):
                 # 검색 결과 페이지도 아니면 검색부터 수행
                 logger.info("검색 결과 페이지도 아님. 검색 수행")
                 home_page = HomePage(page)
-                home_page.search_product("노트북")
-            search_page.select_first_product()
-        product_page.add_to_cart()
+                home_page.fill_search_input("노트북")
+                home_page.click_search_button()
+                home_page.wait_for_search_results()
+            # 상품 선택 (Atomic POM 조합)
+            search_page.wait_for_search_results_load()
+            search_page.click_first_product()
+        # 장바구니에 추가 (Atomic POM 조합)
+        product_page.wait_for_page_load()
+        product_page.click_add_to_cart_button()
     
-    # 구매하기 버튼 클릭
-    page.wait_for_load_state("networkidle")
-    page.click("button:has-text('구매하기')", timeout=10000)
+    # 구매하기 버튼 클릭 (POM 패턴 사용)
+    cart_page = CartPage(page)
+    cart_page.wait_for_page_load()
+    cart_page.click_purchase_button()
     
     # 생성 후 확인
     page.wait_for_load_state("networkidle")

@@ -23,9 +23,12 @@ def user_is_logged_in(page):
         logger.info("로그인되지 않음. 로그인 수행")
         home_page.click_login()
         
-        # 로그인 페이지에서 로그인 수행
+        # 로그인 페이지에서 로그인 수행 (Atomic POM 조합)
         login_page = LoginPage(page)
-        login_page.login("t4adbuy01", "Gmkt1004!!")
+        login_page.fill_username("t4adbuy01")
+        login_page.fill_password("Gmkt1004!!")
+        login_page.click_login_button()
+        login_page.wait_for_login_complete()
     else:
         logger.info("이미 로그인되어 있음")
 
@@ -40,9 +43,12 @@ def user_clicks_login_button(page):
 
 @when(parsers.parse('사용자가 아이디 "{username}"과 비밀번호 "{password}"로 로그인한다'))
 def user_logs_in_with_credentials(page, username, password):
-    """사용자가 아이디와 비밀번호로 로그인"""
+    """사용자가 아이디와 비밀번호로 로그인 (Atomic POM 조합)"""
     login_page = LoginPage(page)
-    login_page.login(username, password)
+    login_page.fill_username(username)
+    login_page.fill_password(password)
+    login_page.click_login_button()
+    login_page.wait_for_login_complete()
     logger.info(f"로그인 완료: {username}")
 
 

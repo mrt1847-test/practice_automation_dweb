@@ -34,7 +34,7 @@ class BasePage:
     
     def click(self, selector: str, timeout: Optional[int] = None) -> None:
         """
-        요소 클릭
+        요소 클릭 (Locator 방식)
         
         Args:
             selector: CSS 선택자 또는 XPath
@@ -42,11 +42,11 @@ class BasePage:
         """
         timeout = timeout or self.timeout
         logger.debug(f"클릭: {selector}")
-        self.page.click(selector, timeout=timeout)
+        self.page.locator(selector).click(timeout=timeout)
     
     def fill(self, selector: str, value: str, timeout: Optional[int] = None) -> None:
         """
-        입력 필드에 값 입력
+        입력 필드에 값 입력 (Locator 방식)
         
         Args:
             selector: CSS 선택자 또는 XPath
@@ -55,7 +55,7 @@ class BasePage:
         """
         timeout = timeout or self.timeout
         logger.debug(f"입력: {selector} = {value}")
-        self.page.fill(selector, value, timeout=timeout)
+        self.page.locator(selector).fill(value, timeout=timeout)
     
     def get_text(self, selector: str, timeout: Optional[int] = None) -> str:
         """

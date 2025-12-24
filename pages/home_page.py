@@ -14,7 +14,7 @@ class HomePage(BasePage):
     # 선택자 정의
     SEARCH_INPUT = "input[placeholder*='검색']"
     SEARCH_BUTTON = "button[type='submit']"
-    LOGIN_BUTTON = "text=로그인"
+    LOGIN_BUTTON = "로그인"
     LOGOUT_BUTTON = "text=로그아웃"
     
     def __init__(self, page: Page):
@@ -25,30 +25,37 @@ class HomePage(BasePage):
             page: Playwright Page 객체
         """
         super().__init__(page)
-        self.base_url = "https://m.gmarket.co.kr"
+        self.base_url = "https://www.gmarket.co.kr"
     
     def navigate(self) -> None:
         """홈 페이지로 이동"""
         logger.info("홈 페이지로 이동")
         self.goto(self.base_url)
     
-    def search_product(self, keyword: str) -> None:
+    def fill_search_input(self, keyword: str) -> None:
         """
-        상품 검색
+        검색어 입력
         
         Args:
             keyword: 검색할 상품명
         """
-        logger.info(f"상품 검색: {keyword}")
-        self.fill(self.SEARCH_INPUT, keyword)
-        self.click(self.SEARCH_BUTTON)
-        # 검색 결과 페이지 로드 대기
+        logger.debug(f"검색어 입력: {keyword}")
+        self.fill("#form__search-keyword", keyword)
+    
+    def click_search_button(self) -> None:
+        """검색 버튼 클릭"""
+        logger.debug("검색 버튼 클릭")
+        self.click("button.button__search.general-clk-spm-d > img.image")
+    
+    def wait_for_search_results(self) -> None:
+        """검색 결과 페이지 로드 대기"""
+        logger.debug("검색 결과 로드 대기")
         self.page.wait_for_load_state("networkidle")
     
     def click_login(self) -> None:
         """로그인 버튼 클릭"""
         logger.info("로그인 버튼 클릭")
-        self.click(self.LOGIN_BUTTON)
+        self.get_by_text_and_click("로그인")
     
     def is_logged_in(self) -> bool:
         """

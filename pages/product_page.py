@@ -76,10 +76,18 @@ class ProductPage(BasePage):
         self.fill(self.QUANTITY_INPUT, quantity)
         logger.info(f"수량 변경: {quantity}개")
     
-    def add_to_cart(self) -> None:
-        """장바구니에 추가"""
-        # TODO: 구현
+    def wait_for_page_load(self) -> None:
+        """페이지 로드 대기"""
+        logger.debug("페이지 로드 대기")
         self.page.wait_for_load_state("networkidle")
-        self.click(self.ADD_TO_CART_BUTTON, timeout=10000)
-        logger.info("장바구니에 상품 추가 완료")
+    
+    def click_add_to_cart_button(self, timeout: int = 10000) -> None:
+        """
+        장바구니 추가 버튼 클릭
+        
+        Args:
+            timeout: 타임아웃 (기본값: 10000ms)
+        """
+        logger.debug("장바구니 추가 버튼 클릭")
+        self.click(self.ADD_TO_CART_BUTTON, timeout=timeout)
 

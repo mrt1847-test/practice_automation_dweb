@@ -104,10 +104,10 @@ def create_login_state(pw):
     page = context.new_page()
     page.goto(GMARKET_URL)
     # 로그인 페이지 이동 및 입력
-    page.click("text=로그인")
-    page.fill("#typeMemberInputId", "t4adbuy01")
-    page.fill("#typeMemberInputPassword", "Gmkt1004!!")
-    page.click("#btn_memberLogin")
+    page.locator("text=로그인").click()
+    page.locator("#typeMemberInputId").fill("t4adbuy01")
+    page.locator("#typeMemberInputPassword").fill("Gmkt1004!!")
+    page.locator("#btn_memberLogin").click()
     # 로그인 완료 대기
     page.wait_for_selector("text=로그아웃", timeout=15000)
     # 로그인 상태 저장

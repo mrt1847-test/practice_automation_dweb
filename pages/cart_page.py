@@ -20,6 +20,7 @@ class CartPage(BasePage):
     TOTAL_PRICE = ""  # TODO: 총 금액 선택자
     REMOVE_BUTTON = ""  # TODO: 제거 버튼 선택자
     CLEAR_CART_BUTTON = ""  # TODO: 장바구니 비우기 버튼 선택자
+    PURCHASE_BUTTON = "button:has-text('구매하기')"  # 구매하기 버튼
     
     def __init__(self, page: Page):
         """
@@ -41,10 +42,14 @@ class CartPage(BasePage):
         self.click(self.CART_ICON)
         logger.info("장바구니 아이콘 클릭")
     
+    def wait_for_cart_page_load(self) -> None:
+        """장바구니 페이지 로드 대기"""
+        logger.debug("장바구니 페이지 로드 대기")
+        self.page.wait_for_load_state("networkidle")
+    
     def is_cart_page_displayed(self) -> bool:
         """장바구니 페이지가 표시되었는지 확인"""
         # TODO: 구현
-        self.page.wait_for_load_state("networkidle")
         return True
     
     def is_cart_preview_displayed(self) -> bool:
@@ -93,4 +98,19 @@ class CartPage(BasePage):
         """장바구니 전체 비우기"""
         # TODO: 구현
         logger.info("장바구니 비우기")
+    
+    def wait_for_page_load(self) -> None:
+        """페이지 로드 대기"""
+        logger.debug("페이지 로드 대기")
+        self.page.wait_for_load_state("networkidle")
+    
+    def click_purchase_button(self, timeout: int = 10000) -> None:
+        """
+        구매하기 버튼 클릭
+        
+        Args:
+            timeout: 타임아웃 (기본값: 10000ms)
+        """
+        logger.debug("구매하기 버튼 클릭")
+        self.click(self.PURCHASE_BUTTON, timeout=timeout)
 
