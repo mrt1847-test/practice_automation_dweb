@@ -98,15 +98,18 @@ practice_automation_dweb/
 │   ├── search_steps.py
 │   ├── product_steps.py
 │   ├── cart_steps.py
-│   └── checkout_steps.py
+│   ├── checkout_steps.py
+│   └── order_steps.py
 │
 ├── pages/                 # Page Object 클래스
 │   ├── base_page.py       # 기본 Page Object
 │   ├── home_page.py
 │   ├── login_page.py
 │   ├── search_page.py
+│   ├── list_page.py
 │   ├── product_page.py
-│   └── cart_page.py
+│   ├── cart_page.py
+│   └── checkout_page.py
 │
 ├── utils/                 # 유틸리티
 │   ├── testrail_step.py
@@ -229,6 +232,19 @@ def user_selects_first_product(page):
 
 각 시나리오의 태그(`@C12345`)를 기반으로 TestRail에 자동으로 결과를 기록합니다.
 
+### 5. 결제 방법 선택
+
+결제 페이지에서 다양한 결제 방법을 지원합니다:
+
+- **스마일페이**: 스마일페이 결제 선택
+- **일반결제 하위 결제 방법**:
+  - 신용/체크카드
+  - 해외발급 신용카드
+  - 무통장 입금 (은행 종류 선택 가능)
+  - 휴대폰 소액결제
+
+일반결제 하위 결제 방법은 자동으로 일반결제를 먼저 선택한 후 해당 결제 방법을 선택합니다.
+
 ## 🔗 TestRail 연동
 
 ### 설정
@@ -270,6 +286,18 @@ Feature: G마켓 구매 플로우
     Given 검색 결과 페이지가 표시된다
     When 사용자가 첫 번째 상품을 선택한다
     Then 상품 상세 페이지가 표시된다
+
+  @C12347
+  Scenario: 상품페이지에서 구매하기 클릭
+    Given 상품 상세 페이지가 표시된다
+    When 사용자가 장바구니에 추가한다
+    Then 장바구니에 상품이 담겨있다
+
+  @C12348
+  Scenario: 구매하기
+    Given 장바구니에 상품이 담겨있다
+    When 사용자가 구매하기 버튼을 클릭한다
+    Then 구매 페이지가 표시된다
 ```
 
 ### Step Definition 예시
@@ -293,6 +321,37 @@ class SearchPage(BasePage):
     def select_first_product(self) -> None:
         self.page.wait_for_load_state("networkidle")
         self.click(self.FIRST_PRODUCT, timeout=10000)
+```
+
+### 결제 페이지 예시
+
+```python
+class CheckoutPage(BasePage):
+    def select_payment_method(self, payment_type: str) -> None:
+        """결제 유형 선택 (스마일페이 또는 일반결제)"""
+        self.get_by_text_and_click(payment_type)
+    
+    def select_normal_payment_method(self, payment_method: str) -> None:
+        """일반결제 하위 결제 방법 선택"""
+        self.get_by_text_and_click(payment_method)
+    
+    def select_bank_type(self, bank_type: str) -> None:
+        """은행 종류 선택 (무통장 입금 시)"""
+        self.get_by_text_and_click(bank_type)
+```
+
+```python
+@when(parsers.parse('사용자가 "{payment_method}"로 결제한다'))
+def user_pays_with_method(page, payment_method):
+    """결제 방법 선택"""
+    checkout_page = CheckoutPage(page)
+    
+    if payment_method == "스마일페이":
+        checkout_page.select_payment_method("스마일페이")
+    elif payment_method in ["신용/체크카드", "해외발급 신용카드", "무통장 입금", "휴대폰 소액결제"]:
+        # 일반결제 먼저 선택 후 하위 결제 방법 선택
+        checkout_page.select_payment_method("일반결제")
+        checkout_page.select_normal_payment_method(payment_method)
 ```
 
 ## 📚 참고 자료

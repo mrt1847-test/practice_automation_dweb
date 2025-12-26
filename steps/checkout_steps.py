@@ -5,6 +5,7 @@
 from pytest_bdd import given, when, then, parsers
 from pages.cart_page import CartPage
 from pages.product_page import ProductPage
+from pages.checkout_page import CheckoutPage
 from pages.search_page import SearchPage
 from pages.home_page import HomePage
 import logging
@@ -27,7 +28,9 @@ def user_clicks_purchase_button(page):
 @when("사용자가 바로구매 버튼을 클릭한다")
 def user_clicks_buy_now_button(page):
     """사용자가 바로구매 버튼 클릭"""
-    # TODO: 바로구매 버튼 클릭 로직 구현
+    product_page = ProductPage(page)
+    product_page.wait_for_page_load()
+    product_page.click_buy_now_button()
     logger.info("바로구매 버튼 클릭 완료")
 
 
@@ -48,18 +51,20 @@ def user_orders_all_items_from_cart(page):
 @then("구매 페이지가 표시된다")
 def purchase_page_is_displayed(page):
     """구매/주문 페이지가 표시되는지 확인 (증명)"""
+    checkout_page = CheckoutPage(page)
     page.wait_for_load_state("networkidle")
-    assert "order" in page.url.lower() or "purchase" in page.url.lower(), "구매 페이지가 표시되지 않았습니다"
+    assert checkout_page.is_checkout_page_displayed(), "구매 페이지가 표시되지 않았습니다"
     logger.info("구매 페이지 표시 확인")
 
 
 @given("구매 페이지가 표시된다")
 def purchase_page_is_displayed_given(page):
     """구매 페이지 상태 보장 (확인 + 필요시 생성)"""
+    checkout_page = CheckoutPage(page)
     page.wait_for_load_state("networkidle")
     
     # 상태 확인
-    if "order" in page.url.lower() or "purchase" in page.url.lower():
+    if checkout_page.is_checkout_page_displayed():
         logger.info("이미 구매 페이지에 있음")
         return
     
@@ -97,7 +102,7 @@ def purchase_page_is_displayed_given(page):
     
     # 생성 후 확인
     page.wait_for_load_state("networkidle")
-    assert "order" in page.url.lower() or "purchase" in page.url.lower(), "구매 페이지 생성 실패"
+    assert checkout_page.is_checkout_page_displayed(), "구매 페이지 생성 실패"
     logger.info("구매 페이지 상태 보장 완료")
 
 
@@ -132,14 +137,28 @@ def user_selects_payment_method(page):
 @when(parsers.parse('사용자가 "{payment_method}"로 결제한다'))
 def user_pays_with_method(page, payment_method):
     """사용자가 특정 결제 방법으로 결제"""
-    # TODO: 결제 방법별 결제 로직 구현
-    logger.info(f"결제 방법: {payment_method}")
+    checkout_page = CheckoutPage(page)
+    page.wait_for_load_state("networkidle")
+    
+    # 스마일페이 선택
+    if payment_method == "스마일페이":
+        checkout_page.select_payment_method("스마일페이")
+    # 일반결제 하위 결제 방법 선택 (신용/체크카드, 해외발급 신용카드, 무통장 입금, 휴대폰 소액결제)
+    elif payment_method in ["신용/체크카드", "해외발급 신용카드", "무통장 입금", "휴대폰 소액결제"]:
+        # 먼저 일반결제 선택
+        checkout_page.select_payment_method("일반결제")
+        # 그 다음 하위 결제 방법 선택
+        checkout_page.select_normal_payment_method(payment_method)
+    
+    logger.info(f"결제 방법 선택: {payment_method}")
 
 
 @when("사용자가 주문을 완료한다")
 def user_completes_order(page):
     """사용자가 주문 완료 버튼 클릭"""
-    # TODO: 주문 완료 버튼 클릭 로직 구현
+    checkout_page = CheckoutPage(page)
+    page.wait_for_load_state("networkidle")
+    checkout_page.click_order_button()
     logger.info("주문 완료")
 
 
