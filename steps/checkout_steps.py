@@ -134,8 +134,8 @@ def user_selects_payment_method(page):
     logger.info("결제 방법 선택")
 
 
-@when(parsers.parse('사용자가 "{payment_method}"로 결제한다'))
-def user_pays_with_method(page, payment_method):
+@when(parsers.parse('사용자가 "{payment_method}"의 "{pament_type}" 으로 결제한다'))
+def user_pays_with_method(page, payment_method, pament_type):
     """사용자가 특정 결제 방법으로 결제"""
     checkout_page = CheckoutPage(page)
     page.wait_for_load_state("networkidle")
@@ -149,6 +149,8 @@ def user_pays_with_method(page, payment_method):
         checkout_page.select_payment_method("일반결제")
         # 그 다음 하위 결제 방법 선택
         checkout_page.select_normal_payment_method(payment_method)
+        # 은행 종류 선택
+        checkout_page.select_bank_type(pament_type)
     
     logger.info(f"결제 방법 선택: {payment_method}")
 

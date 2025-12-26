@@ -149,20 +149,10 @@ def module_exists_in_search_results(page, module_title):
     logger.info(f"{module_title} 모듈 존재 확인 완료")
 
 
-@when(parsers.parse('사용자가 "{module_title}" 모듈로 이동한다'))
-def user_moves_to_module(page, module_title):
-    """특정 모듈로 스크롤 이동 (Atomic POM 조합)"""
-    search_page = SearchPage(page)
-    module = search_page.get_module_by_title(module_title)
-    search_page.scroll_module_into_view(module)
-    logger.info(f"{module_title} 모듈로 이동 완료")
-
-
-@when(parsers.parse('사용자가 "{module_title}" 모듈 내 상품을 찾는다'))
-def user_finds_product_in_module(page, module_title, scenario):
+@when(parsers.parse('사용자가 "{module_title}" 모듈 내 상품을 확인하고 클릭한다'))
+def user_confirms_and_clicks_product_in_module(page, module_title, scenario):
     """
-    특정 모듈 내 상품 찾기 및 상품 코드 저장 (Atomic POM 조합)
-    When: 액션만 수행, 검증은 Then에서
+    모듈 내 상품 노출 확인하고 클릭 (Atomic POM 조합)
     
     Args:
         page: Playwright Page 객체
@@ -171,73 +161,29 @@ def user_finds_product_in_module(page, module_title, scenario):
     """
     search_page = SearchPage(page)
     
-    # Atomic POM 조합 (액션만)
+    # 모듈로 이동
     module = search_page.get_module_by_title(module_title)
+    search_page.scroll_module_into_view(module)
+    
+    # 모듈 내 상품 찾기
     parent = search_page.get_module_parent(module)
     product = search_page.get_product_in_module(parent)
     search_page.scroll_product_into_view(product)
-    goodscode = search_page.get_product_code(product)
     
-    # scenario context에 저장 (다음 step에서 사용)
-    scenario.goodscode = goodscode
-    scenario.product_locator = product  # 검증용으로도 저장
-    
-    logger.info(f"{module_title} 모듈 내 상품 찾기 완료: {goodscode}")
-
-
-@then(parsers.parse('"{module_title}" 모듈 내 상품이 노출되어 있다'))
-def module_product_is_visible(page, module_title, scenario):
-    """
-    모듈 내 상품 노출 확인 (검증)
-    
-    Args:
-        page: Playwright Page 객체
-        module_title: 모듈 타이틀
-        scenario: pytest-bdd scenario context
-    """
-    search_page = SearchPage(page)
-    
-    # scenario context에서 product_locator 가져오기
-    product = getattr(scenario, 'product_locator', None)
-    if not product:
-        # 없으면 다시 찾기
-        module = search_page.get_module_by_title(module_title)
-        parent = search_page.get_module_parent(module)
-        product = search_page.get_product_in_module(parent)
-    
-    # 검증
+    # 상품 노출 확인
     search_page.assert_product_visible(product)
     
-    logger.info(f"{module_title} 모듈 내 상품 노출 확인 완료")
-
-
-@when('사용자가 상품을 클릭한다')
-def user_clicks_product(page, scenario):
-    """
-    상품 클릭 (Atomic POM 조합)
-    scenario context에서 goodscode를 가져옴
-    When: 액션만 수행, 검증은 Then에서
+    # 상품 코드 가져오기
+    goodscode = search_page.get_product_code(product)
     
-    Args:
-        page: Playwright Page 객체
-        scenario: pytest-bdd scenario context (이전 step에서 저장한 goodscode 사용)
-    """
-    # scenario context에서 goodscode 가져오기
-    goodscode = getattr(scenario, 'goodscode', None)
-    if not goodscode:
-        raise ValueError("goodscode가 설정되지 않았습니다. 먼저 모듈 내 상품을 찾아야 합니다.")
-    
-    search_page = SearchPage(page)
-    
-    # Atomic POM 조합 (액션만)
-    product = search_page.get_product_by_code(goodscode)
+    # 상품 클릭
     new_page = search_page.click_product_and_wait_new_page(product)
     
-    # 새 페이지를 scenario context에 저장
-    scenario.new_page = new_page
+    # scenario context에 저장
+    scenario.goodscode = goodscode
     scenario.product_url = new_page.url
     
-    logger.info(f"{goodscode} 상품 클릭 완료")
+    logger.info(f"{module_title} 모듈 내 상품 확인 및 클릭 완료: {goodscode}")
 
 
 @then('상품 페이지로 이동되었다')
