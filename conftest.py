@@ -1,3 +1,14 @@
+# pytest_plugins는 파일 최상단에 위치해야 함 (다른 import보다 먼저)
+pytest_plugins = [
+    "steps.home_steps",
+    "steps.login_steps",
+    "steps.search_steps",
+    "steps.product_steps",
+    "steps.cart_steps",
+    "steps.checkout_steps",
+    "steps.order_steps",
+]
+
 import shutil
 from playwright.sync_api import sync_playwright, Browser, BrowserContext, Page
 # from src.gtas_python_core_v2.gtas_python_core_vault_v2 import Vault
@@ -9,17 +20,6 @@ from pathlib import Path
 import json
 import time
 import re
-
-# Step definitions 자동 로드 (pytest-bdd가 step definition을 찾을 수 있도록)
-# 각 step 파일을 직접 import하여 pytest-bdd가 step definition을 찾을 수 있도록 함
-import steps.home_steps
-import steps.login_steps
-import steps.search_steps
-import steps.product_steps
-import steps.cart_steps
-import steps.checkout_steps
-import steps.order_steps
-
 
 # 브라우저 fixture (세션 단위, 한 번만 실행)
 @pytest.fixture(scope="session")
