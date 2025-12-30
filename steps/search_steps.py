@@ -179,9 +179,15 @@ def user_confirms_and_clicks_product_in_module(page, module_title, bdd_context):
     # 상품 클릭
     new_page = search_page.click_product_and_wait_new_page(product)
     
-    # bdd context에 저장
+    # bdd context에 저장 (새 탭도 함께 저장)
     bdd_context.store['goodscode'] = goodscode
     bdd_context.store['product_url'] = new_page.url
+    bdd_context.store['product_page'] = new_page  # 새 탭 저장
+    
+    # 디버깅: 저장 확인
+    logger.info(f"새 탭 저장 완료 - URL: {new_page.url}")
+    logger.info(f"bdd_context.store에 저장된 키: {list(bdd_context.store.keys())}")
+    logger.info(f"product_page 저장 확인: {'product_page' in bdd_context.store}")
     
     logger.info(f"{module_title} 모듈 내 상품 확인 및 클릭 완료: {goodscode}")
 

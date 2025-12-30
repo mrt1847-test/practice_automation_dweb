@@ -12,16 +12,65 @@ logger = logging.getLogger(__name__)
 
 
 @then("상품 상세 페이지가 표시된다")
-def product_detail_page_is_displayed(page):
+def product_detail_page_is_displayed(page, bdd_context):
     """상품 상세 페이지가 표시되는지 확인 (증명)"""
-    product_page = ProductPage(page)
+    # bdd_context에 새 탭이 저장되어 있으면 그것을 사용
+    product_page_obj = bdd_context.store.get('product_page')
+    if product_page_obj:
+        logger.info("bdd_context에서 새 탭(상품 상세 페이지) 사용하여 확인")
+        actual_page = product_page_obj
+    else:
+        logger.info("기존 page 사용하여 확인")
+        actual_page = page
+    
+    product_page = ProductPage(actual_page)
     assert product_page.is_product_detail_displayed(), "상품 상세 페이지가 표시되지 않았습니다"
     logger.info("상품 상세 페이지 표시 확인")
 
 
 @given("상품 상세 페이지가 표시된다")
-def product_detail_page_is_displayed_given(page):
+def product_detail_page_is_displayed_given(page, bdd_context, context):
     """상품 상세 페이지 상태 보장 (확인 + 필요시 생성)"""
+    # bdd_context에 새 탭이 저장되어 있으면 그것을 사용
+    product_page_obj = bdd_context.store.get('product_page')
+    if product_page_obj:
+        logger.info("bdd_context에서 새 탭(상품 상세 페이지) 사용")
+        # 새 탭이 이미 열려있으므로 확인만 수행
+        product_page = ProductPage(product_page_obj)
+        if product_page.is_product_detail_displayed():
+            logger.info("새 탭의 상품 상세 페이지 확인됨")
+            return
+        else:
+            logger.warning("새 탭이 있지만 상품 상세 페이지가 아님. 기존 page 사용")
+    
+    # bdd_context에 product_url이 있으면 context에서 해당 URL의 페이지 찾기
+    product_url = bdd_context.store.get('product_url')
+    if product_url:
+        logger.info(f"product_url로 새 탭 찾기 시도: {product_url}")
+        # context의 모든 페이지에서 product_url과 일치하는 페이지 찾기
+        found_page = None
+        for p in context.pages:
+            if p.url == product_url or product_url in p.url:
+                logger.info(f"새 탭 찾음: {p.url}")
+                # 찾은 페이지를 bdd_context에 저장 (다음 step에서 사용)
+                bdd_context.store['product_page'] = p
+                found_page = p
+                break
+        
+        if found_page:
+            product_page = ProductPage(found_page)
+            if product_page.is_product_detail_displayed():
+                logger.info("찾은 새 탭의 상품 상세 페이지 확인됨")
+                return
+            else:
+                logger.warning("찾은 새 탭이 상품 상세 페이지가 아님")
+        else:
+            logger.warning(f"product_url({product_url})과 일치하는 페이지를 찾을 수 없음")
+            logger.warning(f"context.pages 개수: {len(context.pages)}")
+            for i, p in enumerate(context.pages):
+                logger.warning(f"  페이지 {i}: {p.url}")
+    
+    # 새 탭이 없거나 상품 상세 페이지가 아니면 기존 로직 사용
     product_page = ProductPage(page)
     
     # 상태 확인
@@ -97,11 +146,52 @@ def product_price_is_displayed(page, price):
     logger.info(f"상품 가격 확인: {price}")
 
 @when("사용자가 구매하기 버튼을 클릭한다")
-def user_clicks_buy_now_button(page):
-    """사용자가 상품 수량 변경"""
-    product_page = ProductPage(page)
+def user_clicks_buy_now_button(page, bdd_context, context):
+    """사용자가 구매하기 버튼을 클릭한다"""
+    # 디버깅: bdd_context 상태 확인
+    logger.debug(f"bdd_context.store에 저장된 키: {list(bdd_context.store.keys())}")
+    logger.debug(f"product_url: {bdd_context.store.get('product_url')}")
+    
+    # bdd_context에 새 탭이 저장되어 있으면 그것을 사용 (새 탭이 상품 상세 페이지)
+    product_page_obj = bdd_context.store.get('product_page')
+    logger.debug(f"product_page_obj 타입: {type(product_page_obj)}")
+    logger.debug(f"product_page_obj 값: {product_page_obj}")
+    
+    if product_page_obj:
+        logger.info(f"bdd_context에서 새 탭(상품 상세 페이지) 사용하여 구매하기 클릭 - URL: {product_page_obj.url}")
+        actual_page = product_page_obj
+    else:
+        # bdd_context에 product_url이 있으면 context에서 해당 URL의 페이지 찾기
+        product_url = bdd_context.store.get('product_url')
+        if product_url:
+            logger.info(f"product_url로 새 탭 찾기 시도: {product_url}")
+            # context의 모든 페이지에서 product_url과 일치하는 페이지 찾기
+            found_page = None
+            for p in context.pages:
+                if p.url == product_url or product_url in p.url:
+                    logger.info(f"새 탭 찾음: {p.url}")
+                    # 찾은 페이지를 bdd_context에 저장 (다음 step에서 사용)
+                    bdd_context.store['product_page'] = p
+                    found_page = p
+                    break
+            
+            if found_page:
+                actual_page = found_page
+            else:
+                logger.warning(f"product_url({product_url})과 일치하는 페이지를 찾을 수 없음. 기존 page 사용")
+                logger.warning(f"기존 page URL: {page.url}")
+                logger.warning(f"context.pages 개수: {len(context.pages)}")
+                for i, p in enumerate(context.pages):
+                    logger.warning(f"  페이지 {i}: {p.url}")
+                actual_page = page
+        else:
+            logger.warning("bdd_context에 product_page와 product_url이 모두 없음. 기존 page 사용하여 구매하기 클릭")
+            logger.warning(f"기존 page URL: {page.url}")
+            actual_page = page
+    
+    product_page = ProductPage(actual_page)
     product_page.click_buy_now_button()
-    logger.info("구매하기 클릭")
+    logger.info("구매하기 클릭 완료")
 
 @then("주문서 페이지로 이동한다")
 def product_price_is_displayed(page, price):

@@ -58,10 +58,11 @@ def page(context: BrowserContext):
 
 # BDD context fixture (시나리오 내 스텝 간 데이터 공유를 위한 전용 객체)
 # pytest-bdd의 내부 scenario fixture에 의존하지 않고 독립적으로 동작
-@pytest.fixture
+@pytest.fixture(scope="module")
 def bdd_context():
     """
     시나리오 내 스텝 간 데이터 공유를 위한 전용 객체
+    같은 feature 파일 내의 모든 시나리오가 같은 context를 공유 (module scope)
     이름 충돌이 없고, 시나리오 메타데이터와 비즈니스 데이터를 분리해서 관리
     """
     class Context:
