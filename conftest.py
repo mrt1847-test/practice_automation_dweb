@@ -31,7 +31,7 @@ def browser():
 
 
 # 컨텍스트 fixture (브라우저 환경)
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def context(browser: Browser):
     context = browser.new_context(no_viewport=True)
 
@@ -47,7 +47,7 @@ def context(browser: Browser):
 
 
 # 페이지 fixture
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def page(context: BrowserContext):
     page = context.new_page()
     page.set_default_timeout(10000)  # 기본 10초 타임아웃

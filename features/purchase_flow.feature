@@ -11,7 +11,7 @@ Feature: G마켓 구매 플로우
     Then 로그인이 완료되었다
     
   @C123451
-  Scenario: "노트북" 검색색
+  Scenario: "노트북" 검색
     Given 사용자가 로그인되어 있다
     When 사용자가 "노트북"을 검색한다
     Then 검색 결과 페이지가 표시된다

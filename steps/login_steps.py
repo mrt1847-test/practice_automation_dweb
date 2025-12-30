@@ -41,7 +41,7 @@ def user_clicks_login_button(page):
     logger.info("로그인 버튼 클릭 완료")
 
 
-@when(parsers.parse('사용자가 아이디 "{username}"과 비밀번호 "{password}"로 로그인한다'))
+@when(parsers.parse('사용자가 아이디 "{username}" 비밀번호 "{password}"로 로그인한다'))
 def user_logs_in_with_credentials(page, username, password):
     """사용자가 아이디와 비밀번호로 로그인 (Atomic POM 조합)"""
     login_page = LoginPage(page)
