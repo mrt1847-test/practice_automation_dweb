@@ -91,3 +91,25 @@ class ProductPage(BasePage):
         logger.debug("장바구니 추가 버튼 클릭")
         self.click(self.ADD_TO_CART_BUTTON, timeout=timeout)
 
+    def click_buy_now_button(self, timeout: int = 10000) -> None:
+        """
+        구매하기 버튼 클릭
+        
+        Args:
+            timeout: 타임아웃 (기본값: 10000ms)
+        """
+        logger.debug("구매하기 버튼 클릭")
+        # nth(0)으로 첫 번째 요소 명시적 선택
+        buy_button = self.page.locator("#coreInsOrderBtn").nth(0)
+        
+        # 요소가 나타날 때까지 먼저 대기
+        buy_button.wait_for(state="attached", timeout=timeout)
+        logger.debug("구매하기 버튼이 DOM에 나타남")
+        
+        # 버튼이 화면에 보이도록 스크롤
+        buy_button.scroll_into_view_if_needed(timeout=timeout)
+        logger.debug("구매하기 버튼이 화면에 보이도록 스크롤 완료")
+        
+        # 버튼 클릭
+        buy_button.click(timeout=timeout)
+        logger.debug("구매하기 버튼 클릭 완료")

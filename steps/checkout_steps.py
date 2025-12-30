@@ -13,7 +13,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-@when("사용자가 구매하기 버튼을 클릭한다")
+@when("사용자가 장바구니 구매하기 버튼을 클릭한다")
 def user_clicks_purchase_button(page):
     """
     사용자가 구매하기 버튼 클릭 (POM 패턴 사용)
