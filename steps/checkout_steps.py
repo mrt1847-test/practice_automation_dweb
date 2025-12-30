@@ -170,3 +170,86 @@ def order_is_completed(page):
     page.wait_for_load_state("networkidle")
     # TODO: 주문 완료 페이지 확인 로직 구현
     logger.info("주문 완료 확인")
+
+
+@given("주문서 페이지 진입상태")
+def checkout_page_state(page):
+    """주문서 페이지 상태 보장 (확인 + 필요시 생성)"""
+    checkout_page = CheckoutPage(page)
+    page.wait_for_load_state("networkidle")
+    
+    # 상태 확인
+    if checkout_page.is_checkout_page_displayed():
+        logger.info("이미 주문서 페이지에 있음")
+        return
+    
+    # 상태가 아니면 강제로 생성
+    logger.info("주문서 페이지가 아님. 구매하기 버튼 클릭 수행")
+    
+    # 장바구니에 상품이 있는지 확인
+    cart_page = CartPage(page)
+    if not cart_page.has_products():
+        # 장바구니가 비어있으면 상품 추가부터 수행
+        logger.info("장바구니가 비어있음. 상품 추가 수행")
+        product_page = ProductPage(page)
+        if not product_page.is_product_detail_displayed():
+            # 상품 상세 페이지도 없으면 상품 선택부터 수행
+            logger.info("상품 상세 페이지가 아님. 상품 선택 수행")
+            search_page = SearchPage(page)
+            if not search_page.is_search_results_displayed():
+                # 검색 결과 페이지도 아니면 검색부터 수행
+                logger.info("검색 결과 페이지도 아님. 검색 수행")
+                home_page = HomePage(page)
+                home_page.fill_search_input("노트북")
+                home_page.click_search_button()
+                home_page.wait_for_search_results()
+            # 상품 선택 (Atomic POM 조합)
+            search_page.wait_for_search_results_load()
+            search_page.click_first_product()
+        # 장바구니에 추가 (Atomic POM 조합)
+        product_page.wait_for_page_load()
+        product_page.click_add_to_cart_button()
+    
+    # 구매하기 버튼 클릭 (POM 패턴 사용)
+    cart_page = CartPage(page)
+    cart_page.wait_for_page_load()
+    cart_page.click_purchase_button()
+    
+    # 생성 후 확인
+    page.wait_for_load_state("networkidle")
+    assert checkout_page.is_checkout_page_displayed(), "주문서 페이지 생성 실패"
+    logger.info("주문서 페이지 상태 보장 완료")
+
+
+@then("주문서 페이지로 이동한다")
+def checkout_page_is_displayed(page):
+    """주문서 페이지로 이동했는지 확인"""
+    checkout_page = CheckoutPage(page)
+    page.wait_for_load_state("networkidle")
+    assert checkout_page.is_checkout_page_displayed(), "주문서 페이지로 이동하지 않았습니다"
+    logger.info("주문서 페이지 이동 확인")
+
+
+@when(parsers.parse('사용자가 "{bank_name}" 무통장입금으로 주문을 생성한다'))
+def user_creates_order_with_bank_transfer(page, bank_name):
+    """사용자가 무통장입금으로 주문 생성"""
+    checkout_page = CheckoutPage(page)
+    page.wait_for_load_state("networkidle")
+    
+    # 일반결제 선택
+    checkout_page.select_payment_method("일반결제")
+    # 무통장 입금 선택
+    checkout_page.select_normal_payment_method("무통장 입금")
+    # 은행 종류 선택
+    checkout_page.select_bank_type(bank_name)
+    # 주문 완료
+    checkout_page.click_order_button()
+    logger.info(f"무통장입금 주문 생성: {bank_name}")
+
+
+@then("주문은 입금 대기 상태로 생성된다")
+def order_is_created_with_pending_payment(page):
+    """주문이 입금 대기 상태로 생성되었는지 확인"""
+    page.wait_for_load_state("networkidle")
+    # TODO: 주문 완료 페이지에서 입금 대기 상태 확인 로직 구현
+    logger.info("입금 대기 상태 주문 생성 확인")
