@@ -150,14 +150,14 @@ def module_exists_in_search_results(page, module_title):
 
 
 @when(parsers.parse('사용자가 "{module_title}" 모듈 내 상품을 확인하고 클릭한다'))
-def user_confirms_and_clicks_product_in_module(page, module_title, scenario):
+def user_confirms_and_clicks_product_in_module(page, module_title, bdd_context):
     """
     모듈 내 상품 노출 확인하고 클릭 (Atomic POM 조합)
     
     Args:
         page: Playwright Page 객체
         module_title: 모듈 타이틀
-        scenario: pytest-bdd scenario context (step 간 데이터 공유용)
+        bdd_context: BDD context (step 간 데이터 공유용)
     """
     search_page = SearchPage(page)
     
@@ -179,27 +179,27 @@ def user_confirms_and_clicks_product_in_module(page, module_title, scenario):
     # 상품 클릭
     new_page = search_page.click_product_and_wait_new_page(product)
     
-    # scenario context에 저장
-    scenario.goodscode = goodscode
-    scenario.product_url = new_page.url
+    # bdd context에 저장
+    bdd_context.store['goodscode'] = goodscode
+    bdd_context.store['product_url'] = new_page.url
     
     logger.info(f"{module_title} 모듈 내 상품 확인 및 클릭 완료: {goodscode}")
 
 
 @then('상품 페이지로 이동되었다')
-def product_page_is_opened(page, scenario):
+def product_page_is_opened(page, bdd_context):
     """
     상품 페이지 이동 확인 (검증)
     
     Args:
         page: Playwright Page 객체
-        scenario: pytest-bdd scenario context
+        bdd_context: BDD context
     """
     search_page = SearchPage(page)
     
-    # scenario context에서 값 가져오기
-    goodscode = getattr(scenario, 'goodscode', None)
-    url = getattr(scenario, 'product_url', None)
+    # bdd context에서 값 가져오기
+    goodscode = bdd_context.store.get('goodscode')
+    url = bdd_context.store.get('product_url')
     
     if not goodscode or not url:
         raise ValueError("goodscode 또는 URL이 설정되지 않았습니다.")

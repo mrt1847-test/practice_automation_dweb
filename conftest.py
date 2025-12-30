@@ -56,6 +56,21 @@ def page(context: BrowserContext):
     page.close()
 
 
+# BDD context fixture (시나리오 내 스텝 간 데이터 공유를 위한 전용 객체)
+# pytest-bdd의 내부 scenario fixture에 의존하지 않고 독립적으로 동작
+@pytest.fixture
+def bdd_context():
+    """
+    시나리오 내 스텝 간 데이터 공유를 위한 전용 객체
+    이름 충돌이 없고, 시나리오 메타데이터와 비즈니스 데이터를 분리해서 관리
+    """
+    class Context:
+        def __init__(self):
+            self.store = {}
+    
+    return Context()
+
+
 # STATE_PATH = "state.json"
 # GMARKET_URL = "https://www.gmarket.co.kr"  # 모바일 페이지 기준 셀렉터 안정성
 
