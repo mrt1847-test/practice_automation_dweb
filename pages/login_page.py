@@ -55,7 +55,7 @@ class LoginPage(BasePage):
             timeout: 타임아웃 (기본값: 15000ms)
         """
         logger.debug("로그인 완료 대기")
-        self.wait_for_selector(self.LOGOUT_BUTTON, timeout=timeout)
+        self.wait_for_selector("text='로그아웃'", timeout=timeout)
     
     def is_login_successful(self) -> bool:
         """
