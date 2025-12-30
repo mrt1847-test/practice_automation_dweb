@@ -21,6 +21,9 @@ from pathlib import Path
 import json
 import time
 import re
+import logging
+
+logger = logging.getLogger(__name__)
 
 # 브라우저 fixture (세션 단위, 한 번만 실행)
 @pytest.fixture(scope="session")
@@ -45,6 +48,98 @@ def context(browser: Browser):
 
     yield context
     context.close()
+
+
+# BrowserSession 클래스
+class BrowserSession:
+    """
+    브라우저 세션 관리 클래스 - 현재 active page 참조 관리
+    상태 관리자 역할: page stack을 통해 탭 전환 추적
+    """
+    def __init__(self, page):
+        """
+        BrowserSession 초기화
+        
+        Args:
+            page: fixture에서 생성한 기본 page (seed 역할)
+        """
+        self._page_stack = [page]  # page stack으로 전환 이력 관리
+    
+    @property
+    def page(self):
+        """
+        현재 active page 반환 (가장 최근에 전환된 page)
+        """
+        return self._page_stack[-1]
+    
+    def switch_to(self, page):
+        """
+        새 페이지로 전환 (명시적 전환)
+        
+        Args:
+            page: 전환할 Page 객체
+        
+        Returns:
+            bool: 전환 성공 여부
+        """
+        if not page:
+            logger.warning("BrowserSession: None 페이지로 전환 시도 실패")
+            return False
+        
+        try:
+            if page.is_closed():
+                logger.warning("BrowserSession: 이미 닫힌 페이지로 전환 시도 실패")
+                return False
+            
+            # 페이지 유효성 검증
+            current_url = page.url
+            if not current_url or current_url == "about:blank":
+                logger.warning(f"BrowserSession: 유효하지 않은 URL의 페이지: {current_url}")
+                # about:blank는 잠시 후 로드될 수 있으므로 경고만
+            
+            self._page_stack.append(page)
+            logger.info(f"BrowserSession: 새 페이지로 전환 - URL: {current_url} (stack depth: {len(self._page_stack)})")
+            return True
+        except Exception as e:
+            logger.error(f"BrowserSession: 페이지 전환 중 오류 발생: {e}")
+            return False
+    
+    def restore(self):
+        """
+        이전 페이지로 복귀 (page stack에서 pop)
+        
+        Returns:
+            bool: 복귀 성공 여부 (stack에 이전 페이지가 있는 경우)
+        """
+        if len(self._page_stack) > 1:
+            previous_page = self._page_stack.pop()
+            logger.info(f"BrowserSession: 이전 페이지로 복귀 - 현재 URL: {self.page.url} (stack depth: {len(self._page_stack)})")
+            return True
+        else:
+            logger.warning("BrowserSession: 복귀할 이전 페이지가 없음")
+            return False
+    
+    def get_page_stack(self):
+        """
+        디버깅용: 현재 page stack의 URL 리스트 반환
+        
+        Returns:
+            list: page stack의 URL 리스트
+        """
+        return [p.url for p in self._page_stack]
+
+
+# BrowserSession fixture
+@pytest.fixture(scope="module")
+def browser_session(page):
+    """
+    BrowserSession fixture - 현재 active page 참조 관리
+    module scope로 유지하여 같은 feature 파일의 시나리오들이 같은 세션을 공유
+    
+    Args:
+        page: fixture에서 생성한 기본 page (seed 역할)
+    """
+    return BrowserSession(page)
 
 
 # 페이지 fixture

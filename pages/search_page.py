@@ -32,15 +32,58 @@ class SearchPage(BasePage):
         logger.debug("검색 결과 페이지 로드 대기")
         self.page.wait_for_load_state("networkidle")
     
-    def click_first_product(self, timeout: int = 10000) -> None:
+    def click_first_product(self, timeout: int = 10000) -> Optional[Page]:
         """
-        첫 번째 상품 클릭
+        첫 번째 상품 클릭하고 새 탭 대기 (새 탭 열림)
         
         Args:
             timeout: 타임아웃 (기본값: 10000ms)
+        
+        Returns:
+            새 탭의 Page 객체 (새 탭이 열리지 않으면 None)
         """
-        logger.debug("첫 번째 상품 클릭")
-        self.click(self.FIRST_PRODUCT, timeout=timeout)
+        logger.debug("첫 번째 상품 클릭 및 새 탭 대기")
+        
+        # 새 탭이 열리는지 확인
+        try:
+            with self.page.context.expect_page(timeout=timeout) as new_page_info:
+                self.click(self.FIRST_PRODUCT, timeout=timeout)
+            
+            new_page = new_page_info.value
+            if new_page:
+                logger.debug(f"새 탭 생성됨: {new_page.url}")
+                
+                # 새 탭을 포커스로 가져오기 (제어 가능하도록)
+                new_page.bring_to_front()
+                logger.debug("새 탭을 포커스로 가져옴")
+                
+                # 새 탭이 실제로 로드되고 제어 가능한 상태가 될 때까지 대기
+                try:
+                    new_page.wait_for_load_state("domcontentloaded", timeout=30000)
+                    logger.debug("새 탭 DOM 로드 완료")
+                except Exception as e:
+                    logger.warning(f"domcontentloaded 대기 실패: {e}")
+                    raise
+                
+                # URL이 실제로 변경되었는지 확인 (about:blank가 아닌지)
+                max_retries = 5
+                for i in range(max_retries):
+                    current_url = new_page.url
+                    if current_url and current_url != "about:blank":
+                        logger.debug(f"새 탭 URL 확인됨: {current_url}")
+                        break
+                    if i < max_retries - 1:
+                        new_page.wait_for_timeout(500)  # 0.5초 대기
+                    else:
+                        logger.warning(f"새 탭 URL이 about:blank 상태입니다: {current_url}")
+                
+                return new_page
+            else:
+                logger.debug("새 탭이 열리지 않음 (같은 페이지에서 이동)")
+                return None
+        except Exception as e:
+            logger.warning(f"새 탭 대기 중 오류 발생 (같은 페이지에서 이동했을 수 있음): {e}")
+            return None
     
     def click_product_by_name(self, product_name: str) -> None:
         """

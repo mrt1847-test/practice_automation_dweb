@@ -14,54 +14,81 @@ logger = logging.getLogger(__name__)
 
 
 @when("사용자가 장바구니 구매하기 버튼을 클릭한다")
-def user_clicks_purchase_button(page):
+def user_clicks_purchase_button(browser_session):
     """
     사용자가 구매하기 버튼 클릭 (POM 패턴 사용)
-    시나리오 태그(@C12345)로 TestRail에 자동 기록됨
+    
+    Args:
+        browser_session: BrowserSession 객체 (page 참조 관리)
     """
-    cart_page = CartPage(page)
+    cart_page = CartPage(browser_session.page)
     cart_page.wait_for_page_load()
     cart_page.click_purchase_button()
     logger.info("구매하기 버튼 클릭 완료")
 
 
 @when("사용자가 바로구매 버튼을 클릭한다")
-def user_clicks_buy_now_button(page):
-    """사용자가 바로구매 버튼 클릭"""
-    product_page = ProductPage(page)
+def user_clicks_buy_now_button(browser_session):
+    """
+    사용자가 바로구매 버튼 클릭
+    
+    Args:
+        browser_session: BrowserSession 객체 (page 참조 관리)
+    """
+    product_page = ProductPage(browser_session.page)
     product_page.wait_for_page_load()
     product_page.click_buy_now_button()
     logger.info("바로구매 버튼 클릭 완료")
 
 
 @when("사용자가 장바구니에서 선택된 상품을 주문한다")
-def user_orders_selected_items_from_cart(page):
-    """사용자가 장바구니에서 선택된 상품 주문"""
+def user_orders_selected_items_from_cart(browser_session):
+    """
+    사용자가 장바구니에서 선택된 상품 주문
+    
+    Args:
+        browser_session: BrowserSession 객체 (page 참조 관리)
+    """
     # TODO: 장바구니에서 선택 주문 로직 구현
     logger.info("장바구니에서 선택 주문")
 
 
 @when("사용자가 장바구니에서 전체 상품을 주문한다")
-def user_orders_all_items_from_cart(page):
-    """사용자가 장바구니의 모든 상품 주문"""
+def user_orders_all_items_from_cart(browser_session):
+    """
+    사용자가 장바구니의 모든 상품 주문
+    
+    Args:
+        browser_session: BrowserSession 객체 (page 참조 관리)
+    """
     # TODO: 장바구니 전체 주문 로직 구현
     logger.info("장바구니 전체 주문")
 
 
 @then("구매 페이지가 표시된다")
-def purchase_page_is_displayed(page):
-    """구매/주문 페이지가 표시되는지 확인 (증명)"""
-    checkout_page = CheckoutPage(page)
-    page.wait_for_load_state("networkidle")
+def purchase_page_is_displayed(browser_session):
+    """
+    구매/주문 페이지가 표시되는지 확인 (증명)
+    
+    Args:
+        browser_session: BrowserSession 객체 (page 참조 관리)
+    """
+    checkout_page = CheckoutPage(browser_session.page)
+    browser_session.page.wait_for_load_state("networkidle")
     assert checkout_page.is_checkout_page_displayed(), "구매 페이지가 표시되지 않았습니다"
     logger.info("구매 페이지 표시 확인")
 
 
 @given("구매 페이지가 표시된다")
-def purchase_page_is_displayed_given(page):
-    """구매 페이지 상태 보장 (확인 + 필요시 생성)"""
-    checkout_page = CheckoutPage(page)
-    page.wait_for_load_state("networkidle")
+def purchase_page_is_displayed_given(browser_session):
+    """
+    구매 페이지 상태 보장 (확인 + 필요시 생성)
+    
+    Args:
+        browser_session: BrowserSession 객체 (page 참조 관리)
+    """
+    checkout_page = CheckoutPage(browser_session.page)
+    browser_session.page.wait_for_load_state("networkidle")
     
     # 상태 확인
     if checkout_page.is_checkout_page_displayed():
@@ -72,19 +99,19 @@ def purchase_page_is_displayed_given(page):
     logger.info("구매 페이지가 아님. 구매하기 버튼 클릭 수행")
     
     # 장바구니에 상품이 있는지 확인
-    cart_page = CartPage(page)
+    cart_page = CartPage(browser_session.page)
     if not cart_page.has_products():
         # 장바구니가 비어있으면 상품 추가부터 수행
         logger.info("장바구니가 비어있음. 상품 추가 수행")
-        product_page = ProductPage(page)
+        product_page = ProductPage(browser_session.page)
         if not product_page.is_product_detail_displayed():
             # 상품 상세 페이지도 없으면 상품 선택부터 수행
             logger.info("상품 상세 페이지가 아님. 상품 선택 수행")
-            search_page = SearchPage(page)
+            search_page = SearchPage(browser_session.page)
             if not search_page.is_search_results_displayed():
                 # 검색 결과 페이지도 아니면 검색부터 수행
                 logger.info("검색 결과 페이지도 아님. 검색 수행")
-                home_page = HomePage(page)
+                home_page = HomePage(browser_session.page)
                 home_page.fill_search_input("노트북")
                 home_page.click_search_button()
                 home_page.wait_for_search_results()
@@ -96,49 +123,77 @@ def purchase_page_is_displayed_given(page):
         product_page.click_add_to_cart_button()
     
     # 구매하기 버튼 클릭 (POM 패턴 사용)
-    cart_page = CartPage(page)
+    cart_page = CartPage(browser_session.page)
     cart_page.wait_for_page_load()
     cart_page.click_purchase_button()
     
     # 생성 후 확인
-    page.wait_for_load_state("networkidle")
+    browser_session.page.wait_for_load_state("networkidle")
     assert checkout_page.is_checkout_page_displayed(), "구매 페이지 생성 실패"
     logger.info("구매 페이지 상태 보장 완료")
 
 
 @when("사용자가 배송지 정보를 입력한다")
-def user_enters_shipping_info(page):
-    """사용자가 배송지 정보 입력"""
+def user_enters_shipping_info(browser_session):
+    """
+    사용자가 배송지 정보 입력
+    
+    Args:
+        browser_session: BrowserSession 객체 (page 참조 관리)
+    """
     # TODO: 배송지 정보 입력 로직 구현
     logger.info("배송지 정보 입력")
 
 
 @when("사용자가 기존 배송지를 선택한다")
-def user_selects_existing_shipping_address(page):
-    """사용자가 저장된 배송지 선택"""
+def user_selects_existing_shipping_address(browser_session):
+    """
+    사용자가 저장된 배송지 선택
+    
+    Args:
+        browser_session: BrowserSession 객체 (page 참조 관리)
+    """
     # TODO: 기존 배송지 선택 로직 구현
     logger.info("기존 배송지 선택")
 
 
 @when(parsers.parse('사용자가 "{address_name}" 배송지를 선택한다'))
-def user_selects_specific_shipping_address(page, address_name):
-    """사용자가 특정 배송지 선택"""
+def user_selects_specific_shipping_address(browser_session, address_name):
+    """
+    사용자가 특정 배송지 선택
+    
+    Args:
+        browser_session: BrowserSession 객체 (page 참조 관리)
+        address_name: 배송지명
+    """
     # TODO: 특정 배송지 선택 로직 구현
     logger.info(f"배송지 선택: {address_name}")
 
 
 @when("사용자가 결제 방법을 선택한다")
-def user_selects_payment_method(page):
-    """사용자가 결제 방법 선택"""
+def user_selects_payment_method(browser_session):
+    """
+    사용자가 결제 방법 선택
+    
+    Args:
+        browser_session: BrowserSession 객체 (page 참조 관리)
+    """
     # TODO: 결제 방법 선택 로직 구현
     logger.info("결제 방법 선택")
 
 
 @when(parsers.parse('사용자가 "{payment_method}"의 "{pament_type}" 으로 결제한다'))
-def user_pays_with_method(page, payment_method, pament_type):
-    """사용자가 특정 결제 방법으로 결제"""
-    checkout_page = CheckoutPage(page)
-    page.wait_for_load_state("networkidle")
+def user_pays_with_method(browser_session, payment_method, pament_type):
+    """
+    사용자가 특정 결제 방법으로 결제
+    
+    Args:
+        browser_session: BrowserSession 객체 (page 참조 관리)
+        payment_method: 결제 방법
+        pament_type: 결제 타입 (은행명 등)
+    """
+    checkout_page = CheckoutPage(browser_session.page)
+    browser_session.page.wait_for_load_state("networkidle")
     
     # 스마일페이 선택
     if payment_method == "스마일페이":
@@ -156,27 +211,45 @@ def user_pays_with_method(page, payment_method, pament_type):
 
 
 @when("사용자가 주문을 완료한다")
-def user_completes_order(page):
-    """사용자가 주문 완료 버튼 클릭"""
-    checkout_page = CheckoutPage(page)
-    page.wait_for_load_state("networkidle")
+def user_completes_order(browser_session):
+    """
+    사용자가 주문 완료 버튼 클릭
+    
+    Args:
+        browser_session: BrowserSession 객체 (page 참조 관리)
+    """
+    checkout_page = CheckoutPage(browser_session.page)
+    browser_session.page.wait_for_load_state("networkidle")
     checkout_page.click_order_button()
     logger.info("주문 완료")
 
 
 @then("주문이 완료되었다")
-def order_is_completed(page):
-    """주문이 성공적으로 완료되었는지 확인"""
-    page.wait_for_load_state("networkidle")
+def order_is_completed(browser_session):
+    """
+    주문이 성공적으로 완료되었는지 확인
+    
+    Args:
+        browser_session: BrowserSession 객체 (page 참조 관리)
+    """
+    browser_session.page.wait_for_load_state("networkidle")
     # TODO: 주문 완료 페이지 확인 로직 구현
     logger.info("주문 완료 확인")
 
 
 @given("주문서 페이지 진입상태")
-def checkout_page_state(page):
-    """주문서 페이지 상태 보장 (확인 + 필요시 생성)"""
-    checkout_page = CheckoutPage(page)
-    page.wait_for_load_state("networkidle")
+def checkout_page_state(browser_session):
+    """
+    주문서 페이지 상태 보장 (확인 + 필요시 생성)
+    
+    Args:
+        browser_session: BrowserSession 객체 (page 참조 관리)
+    """
+    # browser_session.page 사용 (새 탭이 열렸다면 자동으로 새 탭을 가리킴)
+    actual_page = browser_session.page
+    
+    checkout_page = CheckoutPage(actual_page)
+    actual_page.wait_for_load_state("networkidle")
     
     # 상태 확인
     if checkout_page.is_checkout_page_displayed():
@@ -187,54 +260,61 @@ def checkout_page_state(page):
     logger.info("주문서 페이지가 아님. 구매하기 버튼 클릭 수행")
     
     # 장바구니에 상품이 있는지 확인
-    cart_page = CartPage(page)
+    cart_page = CartPage(actual_page)
     if not cart_page.has_products():
         # 장바구니가 비어있으면 상품 추가부터 수행
         logger.info("장바구니가 비어있음. 상품 추가 수행")
-        product_page = ProductPage(page)
+        product_page = ProductPage(actual_page)
         if not product_page.is_product_detail_displayed():
-            # 상품 상세 페이지도 없으면 상품 선택부터 수행
-            logger.info("상품 상세 페이지가 아님. 상품 선택 수행")
-            search_page = SearchPage(page)
-            if not search_page.is_search_results_displayed():
-                # 검색 결과 페이지도 아니면 검색부터 수행
-                logger.info("검색 결과 페이지도 아님. 검색 수행")
-                home_page = HomePage(page)
-                home_page.fill_search_input("노트북")
-                home_page.click_search_button()
-                home_page.wait_for_search_results()
-            # 상품 선택 (Atomic POM 조합)
-            search_page.wait_for_search_results_load()
-            search_page.click_first_product()
+            # 상품 상세 페이지가 아니면 에러
+            logger.warning("상품 상세 페이지가 아님. 현재 페이지에서 장바구니 추가 불가")
+            raise ValueError("상품 상세 페이지가 아닌 상태에서 주문서 페이지 진입 불가")
         # 장바구니에 추가 (Atomic POM 조합)
         product_page.wait_for_page_load()
         product_page.click_add_to_cart_button()
     
     # 구매하기 버튼 클릭 (POM 패턴 사용)
-    cart_page = CartPage(page)
+    cart_page = CartPage(actual_page)
     cart_page.wait_for_page_load()
     cart_page.click_purchase_button()
     
     # 생성 후 확인
-    page.wait_for_load_state("networkidle")
+    actual_page.wait_for_load_state("networkidle")
     assert checkout_page.is_checkout_page_displayed(), "주문서 페이지 생성 실패"
     logger.info("주문서 페이지 상태 보장 완료")
 
 
 @then("주문서 페이지로 이동한다")
-def checkout_page_is_displayed(page):
-    """주문서 페이지로 이동했는지 확인"""
-    checkout_page = CheckoutPage(page)
-    page.wait_for_load_state("networkidle")
+def checkout_page_is_displayed(browser_session):
+    """
+    주문서 페이지로 이동했는지 확인
+    
+    Args:
+        browser_session: BrowserSession 객체 (page 참조 관리)
+    """
+    # browser_session.page 사용 (새 탭이 열렸다면 자동으로 새 탭을 가리킴)
+    actual_page = browser_session.page
+    
+    checkout_page = CheckoutPage(actual_page)
+    actual_page.wait_for_load_state("networkidle")
     assert checkout_page.is_checkout_page_displayed(), "주문서 페이지로 이동하지 않았습니다"
     logger.info("주문서 페이지 이동 확인")
 
 
 @when(parsers.parse('사용자가 "{bank_name}" 무통장입금으로 주문을 생성한다'))
-def user_creates_order_with_bank_transfer(page, bank_name):
-    """사용자가 무통장입금으로 주문 생성"""
-    checkout_page = CheckoutPage(page)
-    page.wait_for_load_state("networkidle")
+def user_creates_order_with_bank_transfer(browser_session, bank_name):
+    """
+    사용자가 무통장입금으로 주문 생성
+    
+    Args:
+        browser_session: BrowserSession 객체 (page 참조 관리)
+        bank_name: 은행명
+    """
+    # browser_session.page 사용 (새 탭이 열렸다면 자동으로 새 탭을 가리킴)
+    actual_page = browser_session.page
+    
+    checkout_page = CheckoutPage(actual_page)
+    actual_page.wait_for_load_state("networkidle")
     
     # 일반결제 선택
     checkout_page.select_payment_method("일반결제")
@@ -248,8 +328,16 @@ def user_creates_order_with_bank_transfer(page, bank_name):
 
 
 @then("주문은 입금 대기 상태로 생성된다")
-def order_is_created_with_pending_payment(page):
-    """주문이 입금 대기 상태로 생성되었는지 확인"""
-    page.wait_for_load_state("networkidle")
+def order_is_created_with_pending_payment(browser_session):
+    """
+    주문이 입금 대기 상태로 생성되었는지 확인
+    
+    Args:
+        browser_session: BrowserSession 객체 (page 참조 관리)
+    """
+    # browser_session.page 사용 (새 탭이 열렸다면 자동으로 새 탭을 가리킴)
+    actual_page = browser_session.page
+    
+    actual_page.wait_for_load_state("networkidle")
     # TODO: 주문 완료 페이지에서 입금 대기 상태 확인 로직 구현
     logger.info("입금 대기 상태 주문 생성 확인")
