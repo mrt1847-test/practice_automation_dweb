@@ -95,3 +95,17 @@ def product_price_is_displayed(page, price):
     product_page = ProductPage(page)
     assert product_page.is_price_displayed(price), f"상품 가격이 '{price}'로 표시되지 않았습니다"
     logger.info(f"상품 가격 확인: {price}")
+
+@when("사용자가 구매하기 버튼을 클릭한다")
+def user_clicks_buy_now_button(page):
+    """사용자가 상품 수량 변경"""
+    product_page = ProductPage(page)
+    product_page.click_buy_now_button()
+    logger.info("구매하기 클릭")
+
+@then("주문서 페이지로 이동한다")
+def product_price_is_displayed(page, price):
+    """주문서 페이지로 이동 확인인"""
+    product_page = ProductPage(page)
+    assert product_page.is_price_displayed(price), f"상품 가격이 '{price}'로 표시되지 않았습니다"
+    logger.info(f"상품 가격 확인: {price}")

@@ -187,19 +187,48 @@ class SearchPage(BasePage):
     
     def click_product_and_wait_new_page(self, product_locator: Locator) -> Page:
         """
-        상품 클릭하고 새 페이지 대기
+        상품 클릭하고 새 탭 대기 (새 탭 열림)
         
         Args:
             product_locator: 상품 Locator 객체
             
         Returns:
-            새 Page 객체
+            새 탭의 Page 객체
         """
-        logger.debug("상품 클릭 및 새 페이지 대기")
+        logger.debug("상품 클릭 및 새 탭 대기")
+        
+        # 새 탭이 생성될 때까지 대기
         with self.page.context.expect_page() as new_page_info:
             product_locator.click()
+        
         new_page = new_page_info.value
-        new_page.wait_for_load_state("networkidle")
+        logger.debug(f"새 탭 생성됨: {new_page.url}")
+        
+        # 새 탭을 포커스로 가져오기 (제어 가능하도록)
+        new_page.bring_to_front()
+        logger.debug("새 탭을 포커스로 가져옴")
+        
+        # 새 탭이 실제로 로드되고 제어 가능한 상태가 될 때까지 대기
+        # 1. domcontentloaded: DOM이 로드되면 완료 (가장 빠름)
+        try:
+            new_page.wait_for_load_state("domcontentloaded", timeout=30000)
+            logger.debug("새 탭 DOM 로드 완료")
+        except Exception as e:
+            logger.warning(f"domcontentloaded 대기 실패: {e}")
+            raise
+        
+        # 2. URL이 실제로 변경되었는지 확인 (about:blank가 아닌지)
+        max_retries = 5
+        for i in range(max_retries):
+            current_url = new_page.url
+            if current_url and current_url != "about:blank":
+                logger.debug(f"새 탭 URL 확인됨: {current_url}")
+                break
+            if i < max_retries - 1:
+                new_page.wait_for_timeout(500)  # 0.5초 대기
+            else:
+                logger.warning(f"새 탭 URL이 about:blank 상태입니다: {current_url}")
+        
         return new_page
     
     def verify_product_code_in_url(self, url: str, goodscode: str) -> None:
