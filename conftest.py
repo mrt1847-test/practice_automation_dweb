@@ -1,5 +1,6 @@
 # pytest_plugins는 파일 최상단에 위치해야 함 (다른 import보다 먼저)
 pytest_plugins = [
+    "pytest_bdd",
     "steps.home_steps",
     "steps.login_steps",
     "steps.search_steps",
