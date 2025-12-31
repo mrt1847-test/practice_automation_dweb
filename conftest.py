@@ -17,9 +17,7 @@ import os
 import pytest
 import requests
 from datetime import datetime
-from pathlib import Path
 import json
-import time
 import re
 import logging
 
@@ -45,36 +43,36 @@ def browser():
             args=["--start-maximized"]
         )
         yield PlaywrightSharedState.browser
-        # 정리
+        # 정리 (with 블록 종료 시 browser는 자동으로 close되므로 수동 close 불필요)
         if PlaywrightSharedState.feature_page:
             try:
                 PlaywrightSharedState.feature_page.close()
-            except:
-                pass
+            except Exception as e:
+                logger.warning(f"feature_page 정리 중 오류: {e}")
             PlaywrightSharedState.feature_page = None
         
         if PlaywrightSharedState.context:
             try:
                 PlaywrightSharedState.context.close()
-            except:
-                pass
-        PlaywrightSharedState.browser.close()
+            except Exception as e:
+                logger.warning(f"context 정리 중 오류: {e}")
+            PlaywrightSharedState.context = None
+        
+        PlaywrightSharedState.feature_browser_session = None
 
 
 # 컨텍스트 fixture (전역 상태에서 가져오기)
 @pytest.fixture(scope="function")
 def context():
-    """각 시나리오에서 사용할 context (전역 상태에서 가져옴)"""
+    """
+    각 시나리오에서 사용할 context (전역 상태에서 가져옴)
+    실제 생성은 pytest_bdd_before_scenario에서 feature 변경 시 수행됨
+    """
     if not PlaywrightSharedState.context:
-        # 혹시 모를 예외 처리: context가 없으면 생성
-        PlaywrightSharedState.context = PlaywrightSharedState.browser.new_context(
-            no_viewport=True
+        raise RuntimeError(
+            "context가 초기화되지 않았습니다. "
+            "pytest_bdd_before_scenario가 먼저 실행되어야 합니다."
         )
-        PlaywrightSharedState.context.add_init_script("""
-            Object.defineProperty(navigator, 'webdriver', {
-                get: () => undefined
-            });
-        """)
     return PlaywrightSharedState.context
 
 
@@ -140,7 +138,8 @@ class BrowserSession:
             bool: 복귀 성공 여부 (stack에 이전 페이지가 있는 경우)
         """
         if len(self._page_stack) > 1:
-            previous_page = self._page_stack.pop()
+            # 현재 페이지를 pop하여 이전 페이지로 복귀
+            self._page_stack.pop()
             logger.info(f"BrowserSession: 이전 페이지로 복귀 - 현재 URL: {self.page.url} (stack depth: {len(self._page_stack)})")
             return True
         else:
@@ -218,15 +217,18 @@ def pytest_bdd_before_scenario(request, feature, scenario):
         if PlaywrightSharedState.feature_page:
             try:
                 PlaywrightSharedState.feature_page.close()
-            except:
-                pass
+            except Exception as e:
+                logger.warning(f"이전 feature_page 정리 중 오류: {e}")
             PlaywrightSharedState.feature_page = None
         
         if PlaywrightSharedState.context:
             try:
                 PlaywrightSharedState.context.close()
-            except:
-                pass
+            except Exception as e:
+                logger.warning(f"이전 context 정리 중 오류: {e}")
+            PlaywrightSharedState.context = None
+        
+        PlaywrightSharedState.feature_browser_session = None
         
         # 새 Feature를 위한 깨끗한 컨텍스트(브라우저 환경) 생성
         PlaywrightSharedState.context = PlaywrightSharedState.browser.new_context(
@@ -386,17 +388,33 @@ def case_id(request):
 
 
 
-with open('config.json') as config_file:
-    config = json.load(config_file)
+# Config 파일 로딩
+try:
+    with open('config.json', 'r', encoding='utf-8') as config_file:
+        config = json.load(config_file)
+except FileNotFoundError:
+    raise RuntimeError("config.json 파일을 찾을 수 없습니다.")
+except json.JSONDecodeError as e:
+    raise RuntimeError(f"config.json 파일의 JSON 형식이 잘못되었습니다: {e}")
 
 # 환경변수 기반 설정
-TESTRAIL_BASE_URL = config['tr_url']
-TESTRAIL_PROJECT_ID = config['project_id']
-TESTRAIL_SUITE_ID = config['suite_id']
-TESTRAIL_SECTION_ID = config['section_id']  # ✅ 섹션 이름으로 지정
-TESTRAIL_USER = (Vault("gmarket").get_Kv_credential("authentication/testrail/automation")).get("username")
-TESTRAIL_TOKEN = (Vault("gmarket").get_Kv_credential("authentication/testrail/automation")).get("password")
-TESTRAIL_MILESTONE_ID = config['milestone_id']
+try:
+    TESTRAIL_BASE_URL = config['tr_url']
+    TESTRAIL_PROJECT_ID = config['project_id']
+    TESTRAIL_SUITE_ID = config['suite_id']
+    TESTRAIL_SECTION_ID = config['section_id']
+    TESTRAIL_MILESTONE_ID = config['milestone_id']
+except KeyError as e:
+    raise RuntimeError(f"config.json에 필수 키 '{e}'가 없습니다.")
+
+try:
+    vault_credentials = Vault("gmarket").get_Kv_credential("authentication/testrail/automation")
+    TESTRAIL_USER = vault_credentials.get("username")
+    TESTRAIL_TOKEN = vault_credentials.get("password")
+    if not TESTRAIL_USER or not TESTRAIL_TOKEN:
+        raise RuntimeError("TestRail 인증 정보(username 또는 password)가 없습니다.")
+except Exception as e:
+    raise RuntimeError(f"TestRail 인증 정보를 가져오는 중 오류 발생: {e}")
 testrail_run_id = None
 case_id_map = {}  # {섹션 이름: [케이스ID 리스트]}
 test_logs = {}  # {nodeid: 로그 문자열} - 테스트별 로그 저장
@@ -600,12 +618,11 @@ def pytest_runtest_setup(item):
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_teardown(item, nextitem):
     """테스트 종료 시 로그 핸들러 초기화 (다음 테스트와 로그 섞임 방지)"""
-    # 로그가 아직 수집되지 않았다면 초기화하지 않음 (pytest_runtest_logreport에서 수집 중일 수 있음)
-    # 하지만 안전을 위해 초기화 (pytest_runtest_logreport에서 이미 수집했을 것)
-    if nextitem:  # 다음 테스트가 있는 경우에만 초기화
-        test_log_handler.clear()
-    
     outcome = yield
+    # teardown 후에 초기화 (pytest_runtest_logreport와 pytest_runtest_makereport가 모두 실행된 후)
+    # 다음 테스트가 있는 경우에만 초기화 (마지막 테스트는 세션 종료 시 정리)
+    if nextitem:
+        test_log_handler.clear()
 
 
 @pytest.hookimpl(hookwrapper=True, tryfirst=True)
@@ -627,7 +644,7 @@ def pytest_runtest_logreport(report):
                 # 로그 라인 수 확인
                 log_lines = logs.split(chr(10))
                 print(f"[DEBUG] 테스트 {nodeid} 로그 수집 완료: {len(log_lines)}줄")
-                # 로그 수집 후 즉시 초기화 (다음 테스트와 로그 섞임 방지)
+                # 로그를 test_logs에 저장했으므로 즉시 초기화 (다음 테스트와 로그 섞임 방지)
                 test_log_handler.clear()
             else:
                 print(f"[DEBUG] 테스트 {nodeid} 로그 없음 (빈 로그 또는 수집 실패)")
@@ -778,6 +795,7 @@ def pytest_runtest_makereport(item, call):
                 log_content = test_logs[item.nodeid]
                 # 사용 후 삭제 (메모리 절약)
                 del test_logs[item.nodeid]
+                print(f"[DEBUG] 테스트 {item.nodeid} 로그를 test_logs에서 가져옴")
             else:
                 # 2. nodeid 부분 매칭 시도 (pytest-bdd는 nodeid 형식이 다를 수 있음)
                 # 정확한 매칭을 위해 여러 형식 시도
