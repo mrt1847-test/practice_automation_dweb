@@ -251,6 +251,9 @@ def pytest_bdd_before_scenario(request, feature, scenario):
         
         PlaywrightSharedState.current_feature_name = feature.name
         
+        # feature 변경 시 로그 핸들러 초기화 (이전 feature의 로그 제거)
+        test_log_handler.clear()
+        
         print(f"\n--- [Context Refresh] '{feature.name}' 전용 환경 생성됨 ---")
 
 
@@ -610,8 +613,12 @@ def pytest_runtest_logreport(report):
             if logs and logs.strip():
                 test_logs[nodeid] = logs
                 print(f"[DEBUG] 테스트 {nodeid} 로그 수집 완료: {len(logs.split(chr(10)))}줄")
+                # 로그 수집 후 즉시 초기화 (다음 테스트와 로그 섞임 방지)
+                test_log_handler.clear()
             else:
                 print(f"[DEBUG] 테스트 {nodeid} 로그 없음 (빈 로그 또는 수집 실패)")
+                # 로그가 없어도 초기화 (이전 로그 제거)
+                test_log_handler.clear()
 
 
 @pytest.hookimpl(hookwrapper=True)
