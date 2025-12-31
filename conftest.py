@@ -184,12 +184,6 @@ def browser_session(page):
     return PlaywrightSharedState.feature_browser_session
 
 
-# pytest_bdd_after_feature 훅 추가 (선택사항)
-def pytest_bdd_after_feature(request, feature):
-    """각 Feature가 끝날 때 실행 (선택사항)"""
-    print(f"--- [Clean Up] '{feature.name}' 완료 ---")
-
-
 # BDD context fixture (시나리오 내 스텝 간 데이터 공유를 위한 전용 객체)
 # pytest-bdd의 내부 scenario fixture에 의존하지 않고 독립적으로 동작
 @pytest.fixture(scope="module")
