@@ -311,6 +311,7 @@ testrail_run_id = None
 case_id_map = {}  # {섹션 이름: [케이스ID 리스트]}
 test_logs = {}  # {nodeid: 로그 문자열} - 테스트별 로그 저장
 current_test_nodeid = None  # 현재 실행 중인 테스트의 nodeid
+active_browser_sessions = {}  # {nodeid: browser_session} - 테스트별 browser_session 저장
 
 
 def testrail_get(endpoint):
@@ -499,10 +500,21 @@ root_logger.addHandler(test_log_handler)
 
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_setup(item):
-    """테스트 시작 시 로그 핸들러 초기화"""
+    """테스트 시작 시 로그 핸들러 초기화 및 browser_session 저장"""
     global current_test_nodeid
     current_test_nodeid = item.nodeid
     test_log_handler.clear()
+    
+    # browser_session fixture가 있으면 저장
+    try:
+        if hasattr(item, '_request'):
+            if "browser_session" in item._request.fixturenames:
+                browser_session = item._request.getfixturevalue("browser_session")
+                if browser_session:
+                    active_browser_sessions[item.nodeid] = browser_session
+    except Exception as e:
+        print(f"[DEBUG] browser_session 저장 실패: {e}")
+    
     outcome = yield
 
 
@@ -591,15 +603,56 @@ def pytest_runtest_makereport(item, call):
 
                 # 스크린샷 시도
                 try:
-                    # browser_session을 사용하는 경우 browser_session.page 사용
                     page = None
-                    if "browser_session" in item.funcargs:
-                        browser_session = item.funcargs.get("browser_session")
-                        if browser_session:
+                    
+                    # 1. 저장된 browser_session에서 가져오기 (가장 안정적)
+                    if item.nodeid in active_browser_sessions:
+                        browser_session = active_browser_sessions[item.nodeid]
+                        if browser_session and hasattr(browser_session, 'page'):
                             page = browser_session.page
-                    # browser_session이 없으면 직접 page fixture 사용
-                    if not page and "page" in item.funcargs:
-                        page = item.funcargs.get("page")
+                            print(f"[DEBUG] browser_session에서 page 가져옴")
+                    
+                    # 2. item.funcargs에서 직접 가져오기 시도
+                    if not page and hasattr(item, 'funcargs') and item.funcargs:
+                        if "browser_session" in item.funcargs:
+                            browser_session = item.funcargs.get("browser_session")
+                            if browser_session and hasattr(browser_session, 'page'):
+                                page = browser_session.page
+                                print(f"[DEBUG] funcargs에서 browser_session.page 가져옴")
+                        if not page and "page" in item.funcargs:
+                            page = item.funcargs.get("page")
+                            print(f"[DEBUG] funcargs에서 page 가져옴")
+                    
+                    # 3. item._request를 통해 fixture 가져오기 시도
+                    if not page and hasattr(item, '_request'):
+                        try:
+                            if "browser_session" in item._request.fixturenames:
+                                browser_session = item._request.getfixturevalue("browser_session")
+                                if browser_session and hasattr(browser_session, 'page'):
+                                    page = browser_session.page
+                                    print(f"[DEBUG] _request에서 browser_session.page 가져옴")
+                        except Exception as e:
+                            print(f"[DEBUG] browser_session fixture 가져오기 실패: {e}")
+                        
+                        if not page:
+                            try:
+                                if "page" in item._request.fixturenames:
+                                    page = item._request.getfixturevalue("page")
+                                    print(f"[DEBUG] _request에서 page 가져옴")
+                            except Exception as e:
+                                print(f"[DEBUG] page fixture 가져오기 실패: {e}")
+                    
+                    # 4. context에서 활성 페이지 찾기 시도
+                    if not page and hasattr(item, '_request'):
+                        try:
+                            if "context" in item._request.fixturenames:
+                                context = item._request.getfixturevalue("context")
+                                if context and context.pages:
+                                    # 가장 최근에 열린 페이지 사용
+                                    page = context.pages[-1]
+                                    print(f"[DEBUG] context에서 page 가져옴")
+                        except Exception as e:
+                            print(f"[DEBUG] context에서 page 찾기 실패: {e}")
                     
                     if page and not page.is_closed():
                         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -609,8 +662,13 @@ def pytest_runtest_makereport(item, call):
                         print(f"[TestRail] 스크린샷 저장 완료: {screenshot_path}")
                     else:
                         print(f"[WARNING] 스크린샷 실패: page 객체를 찾을 수 없음")
+                        print(f"[DEBUG] active_browser_sessions 키: {list(active_browser_sessions.keys())}")
+                        print(f"[DEBUG] funcargs 키: {list(item.funcargs.keys()) if hasattr(item, 'funcargs') and item.funcargs else 'N/A'}")
+                        print(f"[DEBUG] fixturenames: {list(item._request.fixturenames) if hasattr(item, '_request') else 'N/A'}")
                 except Exception as e:
                     print(f"[WARNING] 스크린샷 실패: {e}")
+                    import traceback
+                    print(f"[DEBUG] 스크린샷 실패 상세: {traceback.format_exc()}")
 
             elif result.skipped:
                 status_id = 2  # Blocked
