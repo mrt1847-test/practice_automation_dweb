@@ -506,11 +506,11 @@ def pytest_runtest_setup(item):
     outcome = yield
 
 
-@pytest.hookimpl(hookwrapper=True)
+@pytest.hookimpl(hookwrapper=True, tryfirst=True)
 def pytest_runtest_logreport(report):
     """
     각 테스트의 로그를 수집하여 test_logs에 저장
-    pytest_runtest_makereport보다 먼저 실행되어야 함
+    pytest_runtest_makereport보다 먼저 실행되도록 tryfirst=True 설정
     """
     outcome = yield
     # setup, call, teardown 모든 단계에서 로그 수집
@@ -626,20 +626,31 @@ def pytest_runtest_makereport(item, call):
             else:
                 elapsed = None
 
-            # 수집된 로그 추가 (pytest_runtest_logreport에서 수집한 로그)
+            # 수집된 로그 추가
+            # pytest_runtest_logreport에서 수집한 로그 또는 직접 핸들러에서 가져오기
             # pass/fail/skip 모든 경우에 로그 포함
-            # nodeid가 정확히 일치하지 않을 수 있으므로 부분 매칭도 시도
             log_content = None
+            
+            # 1. test_logs에서 먼저 확인 (pytest_runtest_logreport에서 수집된 경우)
             if item.nodeid in test_logs:
                 log_content = test_logs[item.nodeid]
+                # 사용 후 삭제 (메모리 절약)
+                del test_logs[item.nodeid]
             else:
-                # nodeid 부분 매칭 시도 (pytest-bdd는 nodeid 형식이 다를 수 있음)
-                for stored_nodeid, stored_logs in test_logs.items():
+                # 2. nodeid 부분 매칭 시도 (pytest-bdd는 nodeid 형식이 다를 수 있음)
+                for stored_nodeid, stored_logs in list(test_logs.items()):
                     if item.nodeid in stored_nodeid or stored_nodeid in item.nodeid:
                         log_content = stored_logs
                         # 매칭된 항목도 삭제
                         del test_logs[stored_nodeid]
                         break
+                
+                # 3. 여전히 없으면 직접 핸들러에서 가져오기 (실행 순서 문제 대비)
+                if not log_content:
+                    logs = test_log_handler.get_logs()
+                    if logs and logs.strip():
+                        log_content = logs
+                        print(f"[DEBUG] 테스트 {item.nodeid} 로그를 핸들러에서 직접 가져옴")
             
             if log_content and log_content.strip():  # 로그가 있고 비어있지 않은 경우만 추가
                 comment += f"\n\n--- 실행 로그 ---\n{log_content}"
