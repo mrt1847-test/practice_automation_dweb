@@ -1,8 +1,13 @@
-Feature: Simple Test
-  Simple test feature
+@test_002
+Feature: G마켓 구매 플로우2
+  로그인부터 구매까지의 전체 플로우를 단계별로 테스트합니다.
+  각 단계는 TestRail에 별도로 기록됩니다.
+  각 시나리오는 독립적으로 실행 가능하며, Given에서 필요한 상태를 보장합니다.
 
-  Scenario: Simple scenario
-    Given a simple step
-    When another step
-    Then final step
+  @C1164323
+  Scenario: g 마켓 접속후 로그인 고의 실패
+    Given 사용자가 G마켓 홈페이지에 접속한다
+    When 사용자가 로그인 버튼을 클릭한다
+    And 사용자가 아이디 "test" 비밀번호 "test"로 로그인한다
+    Then 로그인이 완료되었다
 
