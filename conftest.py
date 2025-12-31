@@ -642,15 +642,16 @@ def pytest_runtest_logreport(report):
             # 현재 테스트의 로그만 있어야 함
             logs = test_log_handler.get_logs()
             if logs and logs.strip():
-                # nodeid를 키로 사용하여 저장
+                # nodeid를 키로 사용하여 저장 (성공/실패 모두 저장)
                 test_logs[nodeid] = logs
                 # 로그 라인 수 확인
                 log_lines = logs.split(chr(10))
-                print(f"[DEBUG] 테스트 {nodeid} 로그 수집 완료: {len(log_lines)}줄")
+                print(f"[DEBUG] 테스트 {nodeid} 로그 수집 완료: {len(log_lines)}줄 (outcome: {report.outcome})")
                 # 로그를 test_logs에 저장했으므로 즉시 초기화 (다음 테스트와 로그 섞임 방지)
+                # pytest_runtest_makereport에서 사용할 때까지는 test_logs에 보관됨
                 test_log_handler.clear()
             else:
-                print(f"[DEBUG] 테스트 {nodeid} 로그 없음 (빈 로그 또는 수집 실패)")
+                print(f"[DEBUG] 테스트 {nodeid} 로그 없음 (빈 로그 또는 수집 실패, outcome: {report.outcome})")
                 # 로그가 없어도 초기화 (이전 로그 제거)
                 test_log_handler.clear()
 
@@ -794,11 +795,12 @@ def pytest_runtest_makereport(item, call):
             log_content = None
             
             # 1. test_logs에서 먼저 확인 (pytest_runtest_logreport에서 수집된 경우)
+            log_content = None
             if item.nodeid in test_logs:
                 log_content = test_logs[item.nodeid]
                 # 사용 후 삭제 (메모리 절약)
                 del test_logs[item.nodeid]
-                print(f"[DEBUG] 테스트 {item.nodeid} 로그를 test_logs에서 가져옴")
+                print(f"[DEBUG] 테스트 {item.nodeid} 로그를 test_logs에서 가져옴 (status: {status_id})")
             else:
                 # 2. nodeid 부분 매칭 시도 (pytest-bdd는 nodeid 형식이 다를 수 있음)
                 # 정확한 매칭을 위해 여러 형식 시도
@@ -812,19 +814,28 @@ def pytest_runtest_makereport(item, call):
                         # 매칭된 항목도 삭제
                         del test_logs[stored_nodeid]
                         matched = True
-                        print(f"[DEBUG] 테스트 {item.nodeid} 로그를 매칭된 nodeid {stored_nodeid}에서 가져옴")
+                        print(f"[DEBUG] 테스트 {item.nodeid} 로그를 매칭된 nodeid {stored_nodeid}에서 가져옴 (status: {status_id})")
                         break
                 
-                # 3. 매칭 실패 시 로그 없음 (다른 테스트의 로그와 섞이지 않도록 핸들러에서 직접 가져오지 않음)
+                # 3. 매칭 실패 시 백업으로 핸들러에서 직접 가져오기 시도
+                # (pytest_runtest_logreport가 실행되지 않았을 수 있음)
                 if not matched:
-                    print(f"[DEBUG] 테스트 {item.nodeid}의 로그를 test_logs에서 찾을 수 없음. test_logs 키: {list(test_logs.keys())}")
+                    logs = test_log_handler.get_logs()
+                    if logs and logs.strip():
+                        log_content = logs
+                        print(f"[DEBUG] 테스트 {item.nodeid} 로그를 핸들러에서 직접 가져옴 (백업, status: {status_id})")
+                        # 사용 후 초기화
+                        test_log_handler.clear()
+                    else:
+                        print(f"[DEBUG] 테스트 {item.nodeid}의 로그를 찾을 수 없음. test_logs 키: {list(test_logs.keys())}, status: {status_id}")
             
-            if log_content and log_content.strip():  # 로그가 있고 비어있지 않은 경우만 추가
+            # 성공/실패/스킵 모두에 대해 로그 추가
+            if log_content and log_content.strip():
                 comment += f"\n\n--- 실행 로그 ---\n{log_content}"
-                print(f"[DEBUG] 테스트 {item.nodeid} 로그 추가 완료")
+                print(f"[DEBUG] 테스트 {item.nodeid} 로그 추가 완료 (status: {status_id}, 로그 {len(log_content.split(chr(10)))}줄)")
             else:
                 # 로그가 없는 경우에도 디버깅 정보 출력
-                print(f"[DEBUG] 테스트 {item.nodeid}의 로그가 없음. test_logs 키: {list(test_logs.keys())}")
+                print(f"[DEBUG] 테스트 {item.nodeid}의 로그가 없음 (status: {status_id})")
 
             # TestRail 기록
             payload = {
