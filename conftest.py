@@ -212,6 +212,11 @@ def pytest_bdd_before_feature(request, feature):
     [핵심] 각 .feature 파일이 시작될 때마다 실행됩니다.
     이전 feature의 컨텍스트를 닫고 새 컨텍스트를 생성합니다.
     """
+    # 브라우저 초기화 체크
+    if not PlaywrightSharedState.browser:
+        print(f"[WARNING] 브라우저가 초기화되지 않았습니다. '{feature.name}' feature를 건너뜁니다.")
+        return
+    
     # 이전 feature의 page와 context 정리
     if PlaywrightSharedState.feature_page:
         try:
@@ -396,7 +401,6 @@ testrail_run_id = None
 case_id_map = {}  # {섹션 이름: [케이스ID 리스트]}
 test_logs = {}  # {nodeid: 로그 문자열} - 테스트별 로그 저장
 current_test_nodeid = None  # 현재 실행 중인 테스트의 nodeid
-active_browser_sessions = {}  # {feature_file: {nodeid: browser_session}} - feature 파일별로 browser_session 저장
 
 
 def testrail_get(endpoint):
@@ -585,31 +589,10 @@ root_logger.addHandler(test_log_handler)
 
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_setup(item):
-    """테스트 시작 시 로그 핸들러 초기화 및 browser_session 저장 (feature 파일별로 분리)"""
+    """테스트 시작 시 로그 핸들러 초기화"""
     global current_test_nodeid
     current_test_nodeid = item.nodeid
     test_log_handler.clear()
-    
-    # browser_session fixture가 있으면 feature 파일별로 저장
-    try:
-        if hasattr(item, '_request'):
-            if "browser_session" in item._request.fixturenames:
-                browser_session = item._request.getfixturevalue("browser_session")
-                if browser_session:
-                    # feature 파일 이름 추출 (nodeid에서 첫 번째 부분)
-                    # 예: "test_features.py::test_g_마켓_접속후_로그인" -> "test_features.py"
-                    # 또는 "features/purchase_flow.feature::test_g_마켓_접속후_로그인" -> "features/purchase_flow.feature"
-                    feature_file = item.nodeid.split("::")[0]
-                    
-                    # feature 파일별 딕셔너리 초기화
-                    if feature_file not in active_browser_sessions:
-                        active_browser_sessions[feature_file] = {}
-                    
-                    # 해당 feature 파일의 nodeid로 저장
-                    active_browser_sessions[feature_file][item.nodeid] = browser_session
-                    print(f"[DEBUG] browser_session 저장: {feature_file} -> {item.nodeid}")
-    except Exception as e:
-        print(f"[DEBUG] browser_session 저장 실패: {e}")
     
     outcome = yield
 
@@ -701,25 +684,13 @@ def pytest_runtest_makereport(item, call):
                 try:
                     page = None
                     
-                    # 1. 저장된 browser_session에서 가져오기 (가장 안정적, feature 파일별로 분리)
-                    feature_file = item.nodeid.split("::")[0]
-                    if feature_file in active_browser_sessions:
-                        feature_sessions = active_browser_sessions[feature_file]
-                        # 정확한 nodeid로 먼저 찾기
-                        if item.nodeid in feature_sessions:
-                            browser_session = feature_sessions[item.nodeid]
-                            if browser_session and hasattr(browser_session, 'page'):
-                                page = browser_session.page
-                                print(f"[DEBUG] browser_session에서 page 가져옴 (정확한 nodeid)")
-                        else:
-                            # 정확한 nodeid가 없으면 같은 feature 파일의 첫 번째 session 사용
-                            if feature_sessions:
-                                browser_session = list(feature_sessions.values())[0]
-                                if browser_session and hasattr(browser_session, 'page'):
-                                    page = browser_session.page
-                                    print(f"[DEBUG] browser_session에서 page 가져옴 (같은 feature 파일의 첫 번째 session)")
+                    # PlaywrightSharedState에서 직접 가져오기 (가장 간단하고 안정적)
+                    if PlaywrightSharedState.feature_browser_session:
+                        if hasattr(PlaywrightSharedState.feature_browser_session, 'page'):
+                            page = PlaywrightSharedState.feature_browser_session.page
+                            print(f"[DEBUG] PlaywrightSharedState에서 page 가져옴")
                     
-                    # 2. item.funcargs에서 직접 가져오기 시도
+                    # 백업: item.funcargs에서 직접 가져오기 시도
                     if not page and hasattr(item, 'funcargs') and item.funcargs:
                         if "browser_session" in item.funcargs:
                             browser_session = item.funcargs.get("browser_session")
@@ -730,7 +701,7 @@ def pytest_runtest_makereport(item, call):
                             page = item.funcargs.get("page")
                             print(f"[DEBUG] funcargs에서 page 가져옴")
                     
-                    # 3. item._request를 통해 fixture 가져오기 시도
+                    # 백업: item._request를 통해 fixture 가져오기 시도
                     if not page and hasattr(item, '_request'):
                         try:
                             if "browser_session" in item._request.fixturenames:
@@ -749,18 +720,6 @@ def pytest_runtest_makereport(item, call):
                             except Exception as e:
                                 print(f"[DEBUG] page fixture 가져오기 실패: {e}")
                     
-                    # 4. context에서 활성 페이지 찾기 시도
-                    if not page and hasattr(item, '_request'):
-                        try:
-                            if "context" in item._request.fixturenames:
-                                context = item._request.getfixturevalue("context")
-                                if context and context.pages:
-                                    # 가장 최근에 열린 페이지 사용
-                                    page = context.pages[-1]
-                                    print(f"[DEBUG] context에서 page 가져옴")
-                        except Exception as e:
-                            print(f"[DEBUG] context에서 page 찾기 실패: {e}")
-                    
                     if page and not page.is_closed():
                         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                         screenshot_path = f"screenshots/{case_id}_{timestamp}.png"
@@ -769,9 +728,7 @@ def pytest_runtest_makereport(item, call):
                         print(f"[TestRail] 스크린샷 저장 완료: {screenshot_path}")
                     else:
                         print(f"[WARNING] 스크린샷 실패: page 객체를 찾을 수 없음")
-                        print(f"[DEBUG] active_browser_sessions feature 파일: {list(active_browser_sessions.keys())}")
-                        if feature_file in active_browser_sessions:
-                            print(f"[DEBUG] {feature_file}의 nodeid: {list(active_browser_sessions[feature_file].keys())}")
+                        print(f"[DEBUG] PlaywrightSharedState.feature_browser_session: {PlaywrightSharedState.feature_browser_session is not None}")
                         print(f"[DEBUG] funcargs 키: {list(item.funcargs.keys()) if hasattr(item, 'funcargs') and item.funcargs else 'N/A'}")
                         print(f"[DEBUG] fixturenames: {list(item._request.fixturenames) if hasattr(item, '_request') else 'N/A'}")
                 except Exception as e:
