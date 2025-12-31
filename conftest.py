@@ -310,6 +310,7 @@ TESTRAIL_MILESTONE_ID = config['milestone_id']
 testrail_run_id = None
 case_id_map = {}  # {섹션 이름: [케이스ID 리스트]}
 test_logs = {}  # {nodeid: 로그 문자열} - 테스트별 로그 저장
+current_test_nodeid = None  # 현재 실행 중인 테스트의 nodeid
 
 
 def testrail_get(endpoint):
@@ -465,6 +466,46 @@ def pytest_sessionstart(session):
     print(f"[TestRail] section_id '{section_id_int}' (하위 섹션 포함) Run 생성 완료 (ID={testrail_run_id})")
 
 
+# 커스텀 로그 핸들러 - 테스트 실행 중 로그를 수집
+class TestLogHandler(logging.Handler):
+    """테스트 실행 중 로그를 수집하는 커스텀 핸들러"""
+    def __init__(self):
+        super().__init__()
+        self.logs = []
+    
+    def emit(self, record):
+        """로그 레코드를 수집"""
+        if record.levelno >= logging.INFO:  # INFO 이상만 수집
+            log_message = self.format(record)
+            self.logs.append(log_message)
+    
+    def clear(self):
+        """로그 초기화"""
+        self.logs = []
+    
+    def get_logs(self):
+        """수집된 로그 반환"""
+        return "\n".join(self.logs)
+
+# 전역 로그 핸들러
+test_log_handler = TestLogHandler()
+test_log_handler.setLevel(logging.INFO)
+test_log_handler.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
+
+# 루트 로거에 핸들러 추가
+root_logger = logging.getLogger()
+root_logger.addHandler(test_log_handler)
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_setup(item):
+    """테스트 시작 시 로그 핸들러 초기화"""
+    global current_test_nodeid
+    current_test_nodeid = item.nodeid
+    test_log_handler.clear()
+    outcome = yield
+
+
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_logreport(report):
     """
@@ -474,15 +515,13 @@ def pytest_runtest_logreport(report):
     if report.when == "call":  # 실행 단계만
         nodeid = report.nodeid
         if report.outcome in ("passed", "failed", "skipped"):
-            # 로그 레코드 수집 (INFO 레벨 이상)
-            log_lines = []
-            if hasattr(report, 'caplog') and report.caplog:
-                for record in report.caplog.records:
-                    if record.levelno >= logging.INFO:  # INFO 이상만 수집
-                        log_lines.append(f"{record.levelname}: {record.getMessage()}")
-            
-            if log_lines:
-                test_logs[nodeid] = "\n".join(log_lines)
+            # 수집된 로그 가져오기
+            logs = test_log_handler.get_logs()
+            if logs:
+                test_logs[nodeid] = logs
+                print(f"[DEBUG] 테스트 {nodeid} 로그 수집 완료: {len(logs.split(chr(10)))}줄")
+            else:
+                print(f"[DEBUG] 테스트 {nodeid} 로그 없음")
 
 
 @pytest.hookimpl(hookwrapper=True)
@@ -574,10 +613,16 @@ def pytest_runtest_makereport(item, call):
                 elapsed = None
 
             # 수집된 로그 추가 (pytest_runtest_logreport에서 수집한 로그)
+            # pass/fail/skip 모든 경우에 로그 포함
             if item.nodeid in test_logs:
-                comment += f"\n\n--- 실행 로그 ---\n{test_logs[item.nodeid]}"
+                log_content = test_logs[item.nodeid]
+                if log_content and log_content.strip():  # 로그가 있고 비어있지 않은 경우만 추가
+                    comment += f"\n\n--- 실행 로그 ---\n{log_content}"
                 # 사용 후 삭제 (메모리 절약)
                 del test_logs[item.nodeid]
+            else:
+                # 로그가 없는 경우에도 디버깅 정보 출력
+                print(f"[DEBUG] 테스트 {item.nodeid}의 로그가 test_logs에 없음")
 
             # TestRail 기록
             payload = {
