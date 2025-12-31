@@ -65,8 +65,17 @@ pytest --cache-clear
 ```
 
 ### 특정 feature 파일 실행
+
+먼저 `test_features.py`에서 특정 feature 파일만 로드하도록 수정:
+```python
+# test_features.py
+from pytest_bdd import scenarios
+scenarios("features/purchase_flow.feature")  # 특정 파일만 지정
+```
+
+그 후 실행:
 ```bash
-pipenv run pytest --cache-clear -m test_001 -v
+pipenv run pytest --cache-clear test_features.py -v
 ```
 
 ### 특정 시나리오 실행
