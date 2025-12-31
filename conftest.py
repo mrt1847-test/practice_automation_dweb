@@ -200,55 +200,58 @@ def bdd_context():
     return Context()
 
 
-# pytest_bdd_before_feature 훅 추가 (BrowserSession 클래스 정의 이후에 위치)
-def pytest_bdd_before_feature(request, feature):
+# pytest_bdd_before_scenario 훅 사용 (pytest-bdd에서 지원하는 훅)
+# feature가 변경될 때만 초기화하도록 로직 추가
+def pytest_bdd_before_scenario(request, feature, scenario):
     """
-    [핵심] 각 .feature 파일이 시작될 때마다 실행됩니다.
-    이전 feature의 컨텍스트를 닫고 새 컨텍스트를 생성합니다.
+    [핵심] 각 시나리오가 시작될 때 실행됩니다.
+    feature가 변경되면 이전 feature의 컨텍스트를 닫고 새 컨텍스트를 생성합니다.
     """
     # 브라우저 초기화 체크
     if not PlaywrightSharedState.browser:
         print(f"[WARNING] 브라우저가 초기화되지 않았습니다. '{feature.name}' feature를 건너뜁니다.")
         return
     
-    # 이전 feature의 page와 context 정리
-    if PlaywrightSharedState.feature_page:
-        try:
-            PlaywrightSharedState.feature_page.close()
-        except:
-            pass
-        PlaywrightSharedState.feature_page = None
-    
-    if PlaywrightSharedState.context:
-        try:
-            PlaywrightSharedState.context.close()
-        except:
-            pass
-    
-    # 새 Feature를 위한 깨끗한 컨텍스트(브라우저 환경) 생성
-    PlaywrightSharedState.context = PlaywrightSharedState.browser.new_context(
-        no_viewport=True
-    )
-    
-    # navigator.webdriver 우회
-    PlaywrightSharedState.context.add_init_script("""
-        Object.defineProperty(navigator, 'webdriver', {
-            get: () => undefined
-        });
-    """)
-    
-    # 새 Feature를 위한 page 생성 (같은 feature 내 시나리오들이 공유)
-    PlaywrightSharedState.feature_page = PlaywrightSharedState.context.new_page()
-    PlaywrightSharedState.feature_page.set_default_timeout(10000)
-    
-    # 새 Feature를 위한 browser_session 생성
-    PlaywrightSharedState.feature_browser_session = BrowserSession(
-        PlaywrightSharedState.feature_page
-    )
-    
-    PlaywrightSharedState.current_feature_name = feature.name
-    
-    print(f"\n--- [Context Refresh] '{feature.name}' 전용 환경 생성됨 ---")
+    # feature가 변경되었는지 확인
+    if PlaywrightSharedState.current_feature_name != feature.name:
+        # 이전 feature의 page와 context 정리
+        if PlaywrightSharedState.feature_page:
+            try:
+                PlaywrightSharedState.feature_page.close()
+            except:
+                pass
+            PlaywrightSharedState.feature_page = None
+        
+        if PlaywrightSharedState.context:
+            try:
+                PlaywrightSharedState.context.close()
+            except:
+                pass
+        
+        # 새 Feature를 위한 깨끗한 컨텍스트(브라우저 환경) 생성
+        PlaywrightSharedState.context = PlaywrightSharedState.browser.new_context(
+            no_viewport=True
+        )
+        
+        # navigator.webdriver 우회
+        PlaywrightSharedState.context.add_init_script("""
+            Object.defineProperty(navigator, 'webdriver', {
+                get: () => undefined
+            });
+        """)
+        
+        # 새 Feature를 위한 page 생성 (같은 feature 내 시나리오들이 공유)
+        PlaywrightSharedState.feature_page = PlaywrightSharedState.context.new_page()
+        PlaywrightSharedState.feature_page.set_default_timeout(10000)
+        
+        # 새 Feature를 위한 browser_session 생성
+        PlaywrightSharedState.feature_browser_session = BrowserSession(
+            PlaywrightSharedState.feature_page
+        )
+        
+        PlaywrightSharedState.current_feature_name = feature.name
+        
+        print(f"\n--- [Context Refresh] '{feature.name}' 전용 환경 생성됨 ---")
 
 
 # STATE_PATH = "state.json"
