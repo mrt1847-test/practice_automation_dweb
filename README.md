@@ -75,7 +75,7 @@ scenarios("features/purchase_flow.feature")  # 특정 파일만 지정
 
 그 후 실행:
 ```bash
-pipenv run pytest --cache-clear test_features.py -v
+pipenv run pytest --cache-clear -m test_001 -v
 ```
 
 ### 특정 시나리오 실행
