@@ -597,6 +597,17 @@ def pytest_runtest_setup(item):
     outcome = yield
 
 
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_teardown(item, nextitem):
+    """테스트 종료 시 로그 핸들러 초기화 (다음 테스트와 로그 섞임 방지)"""
+    # 로그가 아직 수집되지 않았다면 초기화하지 않음 (pytest_runtest_logreport에서 수집 중일 수 있음)
+    # 하지만 안전을 위해 초기화 (pytest_runtest_logreport에서 이미 수집했을 것)
+    if nextitem:  # 다음 테스트가 있는 경우에만 초기화
+        test_log_handler.clear()
+    
+    outcome = yield
+
+
 @pytest.hookimpl(hookwrapper=True, tryfirst=True)
 def pytest_runtest_logreport(report):
     """
@@ -608,11 +619,14 @@ def pytest_runtest_logreport(report):
     if report.when == "call":  # 실행 단계만
         nodeid = report.nodeid
         if report.outcome in ("passed", "failed", "skipped"):
-            # 수집된 로그 가져오기
+            # 수집된 로그 가져오기 (이 시점에 현재 테스트의 로그만 있어야 함)
             logs = test_log_handler.get_logs()
             if logs and logs.strip():
+                # nodeid를 키로 사용하여 저장
                 test_logs[nodeid] = logs
-                print(f"[DEBUG] 테스트 {nodeid} 로그 수집 완료: {len(logs.split(chr(10)))}줄")
+                # 로그 라인 수 확인
+                log_lines = logs.split(chr(10))
+                print(f"[DEBUG] 테스트 {nodeid} 로그 수집 완료: {len(log_lines)}줄")
                 # 로그 수집 후 즉시 초기화 (다음 테스트와 로그 섞임 방지)
                 test_log_handler.clear()
             else:
@@ -766,19 +780,23 @@ def pytest_runtest_makereport(item, call):
                 del test_logs[item.nodeid]
             else:
                 # 2. nodeid 부분 매칭 시도 (pytest-bdd는 nodeid 형식이 다를 수 있음)
+                # 정확한 매칭을 위해 여러 형식 시도
+                matched = False
                 for stored_nodeid, stored_logs in list(test_logs.items()):
-                    if item.nodeid in stored_nodeid or stored_nodeid in item.nodeid:
+                    # 정확히 일치하거나, 한쪽이 다른 쪽을 포함하는 경우
+                    if (item.nodeid == stored_nodeid or 
+                        item.nodeid in stored_nodeid or 
+                        stored_nodeid in item.nodeid):
                         log_content = stored_logs
                         # 매칭된 항목도 삭제
                         del test_logs[stored_nodeid]
+                        matched = True
+                        print(f"[DEBUG] 테스트 {item.nodeid} 로그를 매칭된 nodeid {stored_nodeid}에서 가져옴")
                         break
                 
-                # 3. 여전히 없으면 직접 핸들러에서 가져오기 (실행 순서 문제 대비)
-                if not log_content:
-                    logs = test_log_handler.get_logs()
-                    if logs and logs.strip():
-                        log_content = logs
-                        print(f"[DEBUG] 테스트 {item.nodeid} 로그를 핸들러에서 직접 가져옴")
+                # 3. 매칭 실패 시 로그 없음 (다른 테스트의 로그와 섞이지 않도록 핸들러에서 직접 가져오지 않음)
+                if not matched:
+                    print(f"[DEBUG] 테스트 {item.nodeid}의 로그를 test_logs에서 찾을 수 없음. test_logs 키: {list(test_logs.keys())}")
             
             if log_content and log_content.strip():  # 로그가 있고 비어있지 않은 경우만 추가
                 comment += f"\n\n--- 실행 로그 ---\n{log_content}"
