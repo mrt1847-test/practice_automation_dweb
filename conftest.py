@@ -510,18 +510,20 @@ def pytest_runtest_setup(item):
 def pytest_runtest_logreport(report):
     """
     각 테스트의 로그를 수집하여 test_logs에 저장
+    pytest_runtest_makereport보다 먼저 실행되어야 함
     """
     outcome = yield
+    # setup, call, teardown 모든 단계에서 로그 수집
     if report.when == "call":  # 실행 단계만
         nodeid = report.nodeid
         if report.outcome in ("passed", "failed", "skipped"):
             # 수집된 로그 가져오기
             logs = test_log_handler.get_logs()
-            if logs:
+            if logs and logs.strip():
                 test_logs[nodeid] = logs
                 print(f"[DEBUG] 테스트 {nodeid} 로그 수집 완료: {len(logs.split(chr(10)))}줄")
             else:
-                print(f"[DEBUG] 테스트 {nodeid} 로그 없음")
+                print(f"[DEBUG] 테스트 {nodeid} 로그 없음 (빈 로그 또는 수집 실패)")
 
 
 @pytest.hookimpl(hookwrapper=True)
@@ -589,12 +591,24 @@ def pytest_runtest_makereport(item, call):
 
                 # 스크린샷 시도
                 try:
-                    page = item.funcargs.get("page")
+                    # browser_session을 사용하는 경우 browser_session.page 사용
+                    page = None
+                    if "browser_session" in item.funcargs:
+                        browser_session = item.funcargs.get("browser_session")
+                        if browser_session:
+                            page = browser_session.page
+                    # browser_session이 없으면 직접 page fixture 사용
+                    if not page and "page" in item.funcargs:
+                        page = item.funcargs.get("page")
+                    
                     if page and not page.is_closed():
                         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                         screenshot_path = f"screenshots/{case_id}_{timestamp}.png"
                         os.makedirs(os.path.dirname(screenshot_path), exist_ok=True)
                         page.screenshot(path=screenshot_path, timeout=2000)
+                        print(f"[TestRail] 스크린샷 저장 완료: {screenshot_path}")
+                    else:
+                        print(f"[WARNING] 스크린샷 실패: page 객체를 찾을 수 없음")
                 except Exception as e:
                     print(f"[WARNING] 스크린샷 실패: {e}")
 
@@ -614,15 +628,25 @@ def pytest_runtest_makereport(item, call):
 
             # 수집된 로그 추가 (pytest_runtest_logreport에서 수집한 로그)
             # pass/fail/skip 모든 경우에 로그 포함
+            # nodeid가 정확히 일치하지 않을 수 있으므로 부분 매칭도 시도
+            log_content = None
             if item.nodeid in test_logs:
                 log_content = test_logs[item.nodeid]
-                if log_content and log_content.strip():  # 로그가 있고 비어있지 않은 경우만 추가
-                    comment += f"\n\n--- 실행 로그 ---\n{log_content}"
-                # 사용 후 삭제 (메모리 절약)
-                del test_logs[item.nodeid]
+            else:
+                # nodeid 부분 매칭 시도 (pytest-bdd는 nodeid 형식이 다를 수 있음)
+                for stored_nodeid, stored_logs in test_logs.items():
+                    if item.nodeid in stored_nodeid or stored_nodeid in item.nodeid:
+                        log_content = stored_logs
+                        # 매칭된 항목도 삭제
+                        del test_logs[stored_nodeid]
+                        break
+            
+            if log_content and log_content.strip():  # 로그가 있고 비어있지 않은 경우만 추가
+                comment += f"\n\n--- 실행 로그 ---\n{log_content}"
+                print(f"[DEBUG] 테스트 {item.nodeid} 로그 추가 완료")
             else:
                 # 로그가 없는 경우에도 디버깅 정보 출력
-                print(f"[DEBUG] 테스트 {item.nodeid}의 로그가 test_logs에 없음")
+                print(f"[DEBUG] 테스트 {item.nodeid}의 로그가 없음. test_logs 키: {list(test_logs.keys())}")
 
             # TestRail 기록
             payload = {
