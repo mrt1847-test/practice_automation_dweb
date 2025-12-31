@@ -309,6 +309,7 @@ TESTRAIL_TOKEN = (Vault("gmarket").get_Kv_credential("authentication/testrail/au
 TESTRAIL_MILESTONE_ID = config['milestone_id']
 testrail_run_id = None
 case_id_map = {}  # {섹션 이름: [케이스ID 리스트]}
+test_logs = {}  # {nodeid: 로그 문자열} - 테스트별 로그 저장
 
 
 def testrail_get(endpoint):
@@ -335,19 +336,47 @@ def get_all_subsection_ids(parent_section_id, all_sections):
     지정된 섹션 ID와 모든 하위 섹션 ID를 재귀적으로 찾기
     
     Args:
-        parent_section_id: 부모 섹션 ID
+        parent_section_id: 부모 섹션 ID (int 또는 str)
         all_sections: 모든 섹션 리스트 (TestRail API에서 가져온 전체 섹션)
     
     Returns:
         list: 부모 섹션 ID와 모든 하위 섹션 ID 리스트
     """
+    # 타입 통일 (정수로 변환)
+    if isinstance(parent_section_id, str):
+        try:
+            parent_section_id = int(parent_section_id)
+        except ValueError:
+            print(f"[WARNING] parent_section_id를 정수로 변환 실패: {parent_section_id}")
+            return [parent_section_id]
+    
     section_ids = [parent_section_id]
     
     # parent_id가 parent_section_id인 모든 하위 섹션 찾기
     for section in all_sections:
-        if section.get("parent_id") == parent_section_id:
-            # 하위 섹션의 ID 추가
+        section_parent_id = section.get("parent_id")
+        
+        # parent_id가 None이면 최상위 섹션이므로 스킵
+        if section_parent_id is None:
+            continue
+        
+        # 타입 통일 (정수로 변환)
+        if isinstance(section_parent_id, str):
+            try:
+                section_parent_id = int(section_parent_id)
+            except ValueError:
+                continue
+        
+        # parent_id가 일치하는 경우
+        if section_parent_id == parent_section_id:
             child_section_id = section["id"]
+            # 타입 통일
+            if isinstance(child_section_id, str):
+                try:
+                    child_section_id = int(child_section_id)
+                except ValueError:
+                    continue
+            
             section_ids.append(child_section_id)
             # 재귀적으로 하위 섹션의 하위 섹션도 찾기
             section_ids.extend(get_all_subsection_ids(child_section_id, all_sections))
@@ -371,15 +400,33 @@ def pytest_sessionstart(session):
     if not TESTRAIL_SECTION_ID:
         raise RuntimeError("[TestRail] TESTRAIL_SECTION_ID가 정의되지 않았습니다.")
     
+    # TESTRAIL_SECTION_ID를 정수로 변환
+    try:
+        section_id_int = int(TESTRAIL_SECTION_ID)
+    except (ValueError, TypeError):
+        raise RuntimeError(f"[TestRail] TESTRAIL_SECTION_ID '{TESTRAIL_SECTION_ID}'를 정수로 변환할 수 없습니다.")
+    
     # 1. 모든 섹션 가져오기
     print(f"[TestRail] 모든 섹션 가져오기 중...")
     all_sections = testrail_get(
         f"get_sections/{TESTRAIL_PROJECT_ID}&suite_id={TESTRAIL_SUITE_ID}"
     )
     
+    # 디버깅: 섹션 구조 확인
+    print(f"[TestRail] 총 {len(all_sections)}개 섹션 발견")
+    print(f"[TestRail] 찾고자 하는 섹션 ID: {section_id_int} (타입: {type(section_id_int).__name__})")
+    
+    # 지정된 섹션이 존재하는지 확인
+    section_exists = any(s.get("id") == section_id_int for s in all_sections)
+    if not section_exists:
+        print(f"[WARNING] 섹션 ID {section_id_int}가 존재하지 않습니다.")
+        print(f"[DEBUG] 사용 가능한 섹션 ID 샘플 (최대 10개):")
+        for s in all_sections[:10]:
+            print(f"  - ID: {s.get('id')}, Name: {s.get('name')}, Parent ID: {s.get('parent_id')}")
+    
     # 2. 지정된 섹션과 모든 하위 섹션 ID 찾기
-    all_section_ids = get_all_subsection_ids(TESTRAIL_SECTION_ID, all_sections)
-    print(f"[TestRail] 섹션 ID {TESTRAIL_SECTION_ID}와 하위 섹션 {len(all_section_ids) - 1}개 발견: {all_section_ids}")
+    all_section_ids = get_all_subsection_ids(section_id_int, all_sections)
+    print(f"[TestRail] 섹션 ID {section_id_int}와 하위 섹션 {len(all_section_ids) - 1}개 발견: {all_section_ids}")
     
     # 3. 각 섹션의 케이스 가져오기
     all_case_ids = []
@@ -400,7 +447,7 @@ def pytest_sessionstart(session):
     all_case_ids = list(set(all_case_ids))
     
     if not all_case_ids:
-        raise RuntimeError(f"[TestRail] section_id '{TESTRAIL_SECTION_ID}'와 하위 섹션에 케이스가 없습니다.")
+        raise RuntimeError(f"[TestRail] section_id '{section_id_int}'와 하위 섹션에 케이스가 없습니다.")
     
     print(f"[TestRail] 총 {len(all_case_ids)}개 케이스 수집 완료")
     
@@ -415,7 +462,27 @@ def pytest_sessionstart(session):
     }
     run = testrail_post(f"add_run/{TESTRAIL_PROJECT_ID}", payload)
     testrail_run_id = run["id"]
-    print(f"[TestRail] section_id '{TESTRAIL_SECTION_ID}' (하위 섹션 포함) Run 생성 완료 (ID={testrail_run_id})")
+    print(f"[TestRail] section_id '{section_id_int}' (하위 섹션 포함) Run 생성 완료 (ID={testrail_run_id})")
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_logreport(report):
+    """
+    각 테스트의 로그를 수집하여 test_logs에 저장
+    """
+    outcome = yield
+    if report.when == "call":  # 실행 단계만
+        nodeid = report.nodeid
+        if report.outcome in ("passed", "failed", "skipped"):
+            # 로그 레코드 수집 (INFO 레벨 이상)
+            log_lines = []
+            if hasattr(report, 'caplog') and report.caplog:
+                for record in report.caplog.records:
+                    if record.levelno >= logging.INFO:  # INFO 이상만 수집
+                        log_lines.append(f"{record.levelname}: {record.getMessage()}")
+            
+            if log_lines:
+                test_logs[nodeid] = "\n".join(log_lines)
 
 
 @pytest.hookimpl(hookwrapper=True)
@@ -506,10 +573,11 @@ def pytest_runtest_makereport(item, call):
             else:
                 elapsed = None
 
-            # stdout 로그 추가
-            stdout = getattr(item, "_stdout_capture", None)
-            if stdout:
-                comment += f"\n\n--- stdout 로그 ---\n{stdout.strip()}"
+            # 수집된 로그 추가 (pytest_runtest_logreport에서 수집한 로그)
+            if item.nodeid in test_logs:
+                comment += f"\n\n--- 실행 로그 ---\n{test_logs[item.nodeid]}"
+                # 사용 후 삭제 (메모리 절약)
+                del test_logs[item.nodeid]
 
             # TestRail 기록
             payload = {
