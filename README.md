@@ -78,6 +78,17 @@ scenarios("features/purchase_flow.feature")  # 특정 파일만 지정
 pipenv run pytest --cache-clear -m test_001 -v
 ```
 
+> **참고**: `-m test_001` 옵션은 특정 feature 파일에 마커(태그)를 추가한 후 해당 마커가 있는 테스트만 실행하는 명령어입니다.
+> 
+> Feature 파일에 마커를 추가하려면 feature 파일 상단에 태그를 추가하세요:
+> ```gherkin
+> @test_001
+> Feature: Purchase Flow
+>   ...
+> ```
+> 
+> 이렇게 하면 `-m test_001` 옵션으로 해당 feature 파일의 시나리오만 실행할 수 있습니다.
+
 ### 특정 시나리오 실행
 ```bash
 pipenv run pytest --cache-clear -k "무통장입금" -v
