@@ -253,10 +253,11 @@ def pytest_bdd_before_scenario(request, feature, scenario):
         
         PlaywrightSharedState.current_feature_name = feature.name
         
-        # feature 변경 시 로그 핸들러 초기화 (이전 feature의 로그 제거)
-        test_log_handler.clear()
-        
         print(f"\n--- [Context Refresh] '{feature.name}' 전용 환경 생성됨 ---")
+    
+    # 각 시나리오 시작 시 로그 핸들러 초기화 (이전 시나리오의 로그 제거)
+    # pytest_runtest_setup보다 먼저 실행되므로 여기서 초기화하는 것이 안전함
+    test_log_handler.clear()
 
 
 # STATE_PATH = "state.json"
@@ -637,6 +638,8 @@ def pytest_runtest_logreport(report):
         nodeid = report.nodeid
         if report.outcome in ("passed", "failed", "skipped"):
             # 수집된 로그 가져오기 (이 시점에 현재 테스트의 로그만 있어야 함)
+            # pytest_runtest_setup과 pytest_bdd_before_scenario에서 이미 초기화했으므로
+            # 현재 테스트의 로그만 있어야 함
             logs = test_log_handler.get_logs()
             if logs and logs.strip():
                 # nodeid를 키로 사용하여 저장
