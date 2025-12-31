@@ -25,29 +25,57 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# 브라우저와 컨텍스트를 저장할 전역 객체
+class PlaywrightSharedState:
+    browser = None
+    context = None
+    playwright = None
+    current_feature_name = None
+    feature_page = None  # feature 단위로 공유되는 page
+    feature_browser_session = None  # feature 단위로 공유되는 browser_session
+
 # 브라우저 fixture (세션 단위, 한 번만 실행)
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="session", autouse=True)
 def browser():
+    """세션 전체에서 브라우저는 한 번만 실행합니다."""
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False, args=["--start-maximized"])  # True/False로 headless 제어
-        yield browser
-        browser.close()
+        PlaywrightSharedState.playwright = p
+        PlaywrightSharedState.browser = p.chromium.launch(
+            headless=False, 
+            args=["--start-maximized"]
+        )
+        yield PlaywrightSharedState.browser
+        # 정리
+        if PlaywrightSharedState.feature_page:
+            try:
+                PlaywrightSharedState.feature_page.close()
+            except:
+                pass
+            PlaywrightSharedState.feature_page = None
+        
+        if PlaywrightSharedState.context:
+            try:
+                PlaywrightSharedState.context.close()
+            except:
+                pass
+        PlaywrightSharedState.browser.close()
 
 
-# 컨텍스트 fixture (브라우저 환경)
-@pytest.fixture(scope="module")
-def context(browser: Browser):
-    context = browser.new_context(no_viewport=True)
-
-    # navigator.webdriver 우회
-    context.add_init_script("""
-        Object.defineProperty(navigator, 'webdriver', {
-            get: () => undefined
-        });
-    """)
-
-    yield context
-    context.close()
+# 컨텍스트 fixture (전역 상태에서 가져오기)
+@pytest.fixture(scope="function")
+def context():
+    """각 시나리오에서 사용할 context (전역 상태에서 가져옴)"""
+    if not PlaywrightSharedState.context:
+        # 혹시 모를 예외 처리: context가 없으면 생성
+        PlaywrightSharedState.context = PlaywrightSharedState.browser.new_context(
+            no_viewport=True
+        )
+        PlaywrightSharedState.context.add_init_script("""
+            Object.defineProperty(navigator, 'webdriver', {
+                get: () => undefined
+            });
+        """)
+    return PlaywrightSharedState.context
 
 
 # BrowserSession 클래스
@@ -129,26 +157,37 @@ class BrowserSession:
         return [p.url for p in self._page_stack]
 
 
-# BrowserSession fixture
-@pytest.fixture(scope="module")
+# 페이지 fixture (feature 단위로 공유)
+@pytest.fixture(scope="function")
+def page(context: BrowserContext):
+    """
+    각 시나리오에서 사용할 page 객체입니다.
+    같은 feature 파일 내의 시나리오들이 같은 page를 공유합니다.
+    """
+    if not PlaywrightSharedState.feature_page:
+        # 혹시 모를 예외 처리: page가 없으면 생성
+        PlaywrightSharedState.feature_page = context.new_page()
+        PlaywrightSharedState.feature_page.set_default_timeout(10000)
+    return PlaywrightSharedState.feature_page
+
+
+# BrowserSession fixture (feature 단위로 공유)
+@pytest.fixture(scope="function")
 def browser_session(page):
     """
     BrowserSession fixture - 현재 active page 참조 관리
-    module scope로 유지하여 같은 feature 파일의 시나리오들이 같은 세션을 공유
-    
-    Args:
-        page: fixture에서 생성한 기본 page (seed 역할)
+    같은 feature 파일 내의 시나리오들이 같은 browser_session을 공유합니다.
     """
-    return BrowserSession(page)
+    if not PlaywrightSharedState.feature_browser_session:
+        # 혹시 모를 예외 처리: browser_session이 없으면 생성
+        PlaywrightSharedState.feature_browser_session = BrowserSession(page)
+    return PlaywrightSharedState.feature_browser_session
 
 
-# 페이지 fixture
-@pytest.fixture(scope="module")
-def page(context: BrowserContext):
-    page = context.new_page()
-    page.set_default_timeout(10000)  # 기본 10초 타임아웃
-    yield page
-    page.close()
+# pytest_bdd_after_feature 훅 추가 (선택사항)
+def pytest_bdd_after_feature(request, feature):
+    """각 Feature가 끝날 때 실행 (선택사항)"""
+    print(f"--- [Clean Up] '{feature.name}' 완료 ---")
 
 
 # BDD context fixture (시나리오 내 스텝 간 데이터 공유를 위한 전용 객체)
@@ -165,6 +204,52 @@ def bdd_context():
             self.store = {}
     
     return Context()
+
+
+# pytest_bdd_before_feature 훅 추가 (BrowserSession 클래스 정의 이후에 위치)
+def pytest_bdd_before_feature(request, feature):
+    """
+    [핵심] 각 .feature 파일이 시작될 때마다 실행됩니다.
+    이전 feature의 컨텍스트를 닫고 새 컨텍스트를 생성합니다.
+    """
+    # 이전 feature의 page와 context 정리
+    if PlaywrightSharedState.feature_page:
+        try:
+            PlaywrightSharedState.feature_page.close()
+        except:
+            pass
+        PlaywrightSharedState.feature_page = None
+    
+    if PlaywrightSharedState.context:
+        try:
+            PlaywrightSharedState.context.close()
+        except:
+            pass
+    
+    # 새 Feature를 위한 깨끗한 컨텍스트(브라우저 환경) 생성
+    PlaywrightSharedState.context = PlaywrightSharedState.browser.new_context(
+        no_viewport=True
+    )
+    
+    # navigator.webdriver 우회
+    PlaywrightSharedState.context.add_init_script("""
+        Object.defineProperty(navigator, 'webdriver', {
+            get: () => undefined
+        });
+    """)
+    
+    # 새 Feature를 위한 page 생성 (같은 feature 내 시나리오들이 공유)
+    PlaywrightSharedState.feature_page = PlaywrightSharedState.context.new_page()
+    PlaywrightSharedState.feature_page.set_default_timeout(10000)
+    
+    # 새 Feature를 위한 browser_session 생성
+    PlaywrightSharedState.feature_browser_session = BrowserSession(
+        PlaywrightSharedState.feature_page
+    )
+    
+    PlaywrightSharedState.current_feature_name = feature.name
+    
+    print(f"\n--- [Context Refresh] '{feature.name}' 전용 환경 생성됨 ---")
 
 
 # STATE_PATH = "state.json"
