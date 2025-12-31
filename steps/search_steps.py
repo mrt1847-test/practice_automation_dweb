@@ -241,10 +241,9 @@ def user_confirms_and_clicks_product_in_module(browser_session, module_title, bd
     # 🔥 명시적 페이지 전환 (상태 관리자 패턴)
     browser_session.switch_to(new_page)
     
-    # bdd context에 저장 (호환성 유지)
+    # bdd context에 저장 (goodscode, product_url 등 다른 데이터는 유지)
     bdd_context.store['goodscode'] = goodscode
     bdd_context.store['product_url'] = new_page.url
-    bdd_context.store['product_page'] = new_page
     
     logger.info(f"{module_title} 모듈 내 상품 확인 및 클릭 완료: {goodscode}")
 

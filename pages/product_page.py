@@ -28,10 +28,24 @@ class ProductPage(BasePage):
         super().__init__(page)
     
     def is_product_detail_displayed(self) -> bool:
-        """상품 상세 페이지가 표시되었는지 확인"""
-        # TODO: 구현
-        self.page.wait_for_load_state("networkidle")
-        return True
+        """
+        상품 상세 페이지가 표시되었는지 확인
+        구매하기 버튼이나 상품 상세 페이지의 핵심 요소가 나타나는지 확인
+        """
+        try:
+            # domcontentloaded까지는 빠르게 기다림 (필수)
+            self.page.wait_for_load_state("domcontentloaded", timeout=10000)
+            
+            # 상품 상세 페이지의 핵심 요소 확인 (구매하기 버튼)
+            # 이 요소가 나타나면 상품 상세 페이지가 로드된 것으로 간주
+            buy_button = self.page.locator("#coreInsOrderBtn")
+            buy_button.wait_for(state="attached", timeout=15000)
+            
+            logger.debug("상품 상세 페이지 확인됨 (구매하기 버튼 발견)")
+            return True
+        except Exception as e:
+            logger.warning(f"상품 상세 페이지 확인 실패: {e}")
+            return False
     
     def get_product_name(self) -> str:
         """상품명 가져오기"""
