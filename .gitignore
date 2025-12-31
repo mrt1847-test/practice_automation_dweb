@@ -27,5 +27,3 @@ node_modules/
 dump.rdb
 
 .DS_Store
-
-config.json
