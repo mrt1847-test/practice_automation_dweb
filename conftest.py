@@ -311,7 +311,7 @@ testrail_run_id = None
 case_id_map = {}  # {섹션 이름: [케이스ID 리스트]}
 test_logs = {}  # {nodeid: 로그 문자열} - 테스트별 로그 저장
 current_test_nodeid = None  # 현재 실행 중인 테스트의 nodeid
-active_browser_sessions = {}  # {nodeid: browser_session} - 테스트별 browser_session 저장
+active_browser_sessions = {}  # {feature_file: {nodeid: browser_session}} - feature 파일별로 browser_session 저장
 
 
 def testrail_get(endpoint):
@@ -500,18 +500,29 @@ root_logger.addHandler(test_log_handler)
 
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_setup(item):
-    """테스트 시작 시 로그 핸들러 초기화 및 browser_session 저장"""
+    """테스트 시작 시 로그 핸들러 초기화 및 browser_session 저장 (feature 파일별로 분리)"""
     global current_test_nodeid
     current_test_nodeid = item.nodeid
     test_log_handler.clear()
     
-    # browser_session fixture가 있으면 저장
+    # browser_session fixture가 있으면 feature 파일별로 저장
     try:
         if hasattr(item, '_request'):
             if "browser_session" in item._request.fixturenames:
                 browser_session = item._request.getfixturevalue("browser_session")
                 if browser_session:
-                    active_browser_sessions[item.nodeid] = browser_session
+                    # feature 파일 이름 추출 (nodeid에서 첫 번째 부분)
+                    # 예: "test_features.py::test_g_마켓_접속후_로그인" -> "test_features.py"
+                    # 또는 "features/purchase_flow.feature::test_g_마켓_접속후_로그인" -> "features/purchase_flow.feature"
+                    feature_file = item.nodeid.split("::")[0]
+                    
+                    # feature 파일별 딕셔너리 초기화
+                    if feature_file not in active_browser_sessions:
+                        active_browser_sessions[feature_file] = {}
+                    
+                    # 해당 feature 파일의 nodeid로 저장
+                    active_browser_sessions[feature_file][item.nodeid] = browser_session
+                    print(f"[DEBUG] browser_session 저장: {feature_file} -> {item.nodeid}")
     except Exception as e:
         print(f"[DEBUG] browser_session 저장 실패: {e}")
     
@@ -605,12 +616,23 @@ def pytest_runtest_makereport(item, call):
                 try:
                     page = None
                     
-                    # 1. 저장된 browser_session에서 가져오기 (가장 안정적)
-                    if item.nodeid in active_browser_sessions:
-                        browser_session = active_browser_sessions[item.nodeid]
-                        if browser_session and hasattr(browser_session, 'page'):
-                            page = browser_session.page
-                            print(f"[DEBUG] browser_session에서 page 가져옴")
+                    # 1. 저장된 browser_session에서 가져오기 (가장 안정적, feature 파일별로 분리)
+                    feature_file = item.nodeid.split("::")[0]
+                    if feature_file in active_browser_sessions:
+                        feature_sessions = active_browser_sessions[feature_file]
+                        # 정확한 nodeid로 먼저 찾기
+                        if item.nodeid in feature_sessions:
+                            browser_session = feature_sessions[item.nodeid]
+                            if browser_session and hasattr(browser_session, 'page'):
+                                page = browser_session.page
+                                print(f"[DEBUG] browser_session에서 page 가져옴 (정확한 nodeid)")
+                        else:
+                            # 정확한 nodeid가 없으면 같은 feature 파일의 첫 번째 session 사용
+                            if feature_sessions:
+                                browser_session = list(feature_sessions.values())[0]
+                                if browser_session and hasattr(browser_session, 'page'):
+                                    page = browser_session.page
+                                    print(f"[DEBUG] browser_session에서 page 가져옴 (같은 feature 파일의 첫 번째 session)")
                     
                     # 2. item.funcargs에서 직접 가져오기 시도
                     if not page and hasattr(item, 'funcargs') and item.funcargs:
@@ -662,7 +684,9 @@ def pytest_runtest_makereport(item, call):
                         print(f"[TestRail] 스크린샷 저장 완료: {screenshot_path}")
                     else:
                         print(f"[WARNING] 스크린샷 실패: page 객체를 찾을 수 없음")
-                        print(f"[DEBUG] active_browser_sessions 키: {list(active_browser_sessions.keys())}")
+                        print(f"[DEBUG] active_browser_sessions feature 파일: {list(active_browser_sessions.keys())}")
+                        if feature_file in active_browser_sessions:
+                            print(f"[DEBUG] {feature_file}의 nodeid: {list(active_browser_sessions[feature_file].keys())}")
                         print(f"[DEBUG] funcargs 키: {list(item.funcargs.keys()) if hasattr(item, 'funcargs') and item.funcargs else 'N/A'}")
                         print(f"[DEBUG] fixturenames: {list(item._request.fixturenames) if hasattr(item, '_request') else 'N/A'}")
                 except Exception as e:
