@@ -45,7 +45,32 @@ class HomePage(BasePage):
     def click_search_button(self) -> None:
         """검색 버튼 클릭"""
         logger.debug("검색 버튼 클릭")
-        self.click("button.button__search.general-clk-spm-d > img.image")
+        
+        # 부모 버튼 요소를 직접 클릭 (이미지가 아닌)
+        search_button = self.page.locator("button.button__search.general-clk-spm-d")
+        
+        # 요소가 나타날 때까지 대기
+        search_button.wait_for(state="attached", timeout=10000)
+        logger.debug("검색 버튼 발견")
+        
+        # 요소가 화면에 보이도록 명시적으로 스크롤
+        search_button.scroll_into_view_if_needed(timeout=10000)
+        logger.debug("검색 버튼 스크롤 완료")
+        
+        # 요소가 보일 때까지 대기
+        search_button.wait_for(state="visible", timeout=10000)
+        logger.debug("검색 버튼 표시 확인")
+        
+        # 클릭 시도
+        try:
+            search_button.click(timeout=5000)
+            logger.debug("일반 클릭 성공")
+        except Exception as e:
+            logger.warning(f"일반 클릭 실패, force 클릭 시도: {e}")
+            search_button.click(force=True)
+            logger.debug("force 클릭 완료")
+        
+        logger.info("검색 버튼 클릭 완료")
     
     def wait_for_search_results(self) -> None:
         """검색 결과 페이지 로드 대기"""

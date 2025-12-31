@@ -317,7 +317,7 @@ def user_creates_order_with_bank_transfer(browser_session, bank_name):
     actual_page.wait_for_load_state("networkidle")
     
     # 일반결제 선택
-    checkout_page.select_payment_method("일반결제")
+    checkout_page.select_payment_method("일반 결제")
     # 무통장 입금 선택
     checkout_page.select_normal_payment_method("무통장 입금")
     # 은행 종류 선택
