@@ -169,4 +169,7 @@ class ProductPage(BasePage):
         
         # n번쨰 그룹상품 클릭
         group_product.click(timeout=timeout)
-        logger.debug("n번쨰 그룹상품 클릭 완료")
+
+        # 선택 버튼 클릭
+        self.page.get_by_text("선택", exact=True).nth(0).click()
+        logger.debug("n번쨰 그룹상품 선택택 완료")
