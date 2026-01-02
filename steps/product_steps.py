@@ -201,5 +201,10 @@ def user_clicks_buy_now_button(browser_session):
         browser_session: BrowserSession 객체 (page 참조 관리)
     """
     product_page = ProductPage(browser_session.page)
+    try:
+        product_page.select_group_product(1)
+    except:
+        logger.debug(f"그룹상품 선택 실패")
+        pass
     product_page.click_buy_now_button()
     logger.info("구매하기 클릭 완료")

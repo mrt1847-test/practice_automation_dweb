@@ -127,3 +127,46 @@ class ProductPage(BasePage):
         # 버튼 클릭
         buy_button.click(timeout=timeout)
         logger.debug("구매하기 버튼 클릭 완료")
+
+    def select_group_product(self, n: int, timeout: int = 10000) -> None:
+        """
+        n 번째 그룹상품 선택 버튼 클릭
+        
+        Args:   
+            n: 그룹상품 번호
+            timeout: 타임아웃 (기본값: 10000ms)
+        """
+        if n < 10:
+            n = f"0{n}"
+        else:
+            n = f"{n}"
+        logger.debug("그룹 옵션레이어 클릭")
+        # nth(0)으로 첫 번째 요소 명시적 선택
+        group_product_layer = self.page.locator(".select-item_option").nth(0)
+        
+        # 요소가 나타날 때까지 먼저 대기
+        group_product_layer.wait_for(state="attached", timeout=timeout)
+        logger.debug("그룹 옵션레이어 DOM에 나타남")
+        
+        # 그룹 옵션레이어 화면에 보이도록 스크롤
+        group_product_layer.scroll_into_view_if_needed(timeout=timeout)
+        logger.debug("그룹 옵션레이어 화면에 보이도록 스크롤 완료")
+        
+        # 그룹 옵션레이어 클릭
+        group_product_layer.click(timeout=timeout)
+        logger.debug("그룹 옵션레이어 클릭 완료")
+
+        #n번쨰 그룹상품 선택
+        group_product = self.page.locator(f"#coreAnchor{n}")
+        
+        # 요소가 나타날 때까지 먼저 대기
+        group_product.wait_for(state="attached", timeout=timeout)
+        logger.debug("n번쨰 그룹상품 DOM에 나타남")
+        
+        # n번쨰 그룹상품 화면에 보이도록 스크롤
+        group_product.scroll_into_view_if_needed(timeout=timeout)
+        logger.debug("n번쨰 그룹상품 화면에 보이도록 스크롤 완료")
+        
+        # n번쨰 그룹상품 클릭
+        group_product.click(timeout=timeout)
+        logger.debug("n번쨰 그룹상품 클릭 완료")
