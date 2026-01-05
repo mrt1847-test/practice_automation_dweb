@@ -3,6 +3,7 @@ G마켓 홈 페이지 객체
 """
 from pages.base_page import BasePage
 from playwright.sync_api import Page
+from utils.urls import BASE_URL
 import logging
 
 logger = logging.getLogger(__name__)
@@ -25,7 +26,7 @@ class HomePage(BasePage):
             page: Playwright Page 객체
         """
         super().__init__(page)
-        self.base_url = "https://www.gmarket.co.kr"
+        self.base_url = BASE_URL
     
     def navigate(self) -> None:
         """홈 페이지로 이동"""

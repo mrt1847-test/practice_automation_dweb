@@ -130,7 +130,7 @@ class ProductPage(BasePage):
 
     def select_group_product(self, n: int, timeout: int = 10000) -> None:
         """
-        n 번째 그룹상품 선택 버튼 클릭
+        n 번째 그룹상품 선택 
         
         Args:   
             n: 그룹상품 번호

@@ -6,6 +6,7 @@ from pytest_bdd import given, when, then, parsers
 from playwright.sync_api import expect
 from pages.home_page import HomePage
 from pages.search_page import SearchPage
+from utils.urls import search_url
 import logging
 
 logger = logging.getLogger(__name__)
@@ -36,10 +37,16 @@ def user_has_searched_product(browser_session, keyword):
         browser_session: BrowserSession 객체 (page 참조 관리)
         keyword: 검색 키워드
     """
-    home_page = HomePage(browser_session.page)
-    home_page.fill_search_input(keyword)
-    home_page.click_search_button()
-    home_page.wait_for_search_results()
+    search_url_value = search_url(keyword)
+    current_url = browser_session.page.url
+    if keyword in current_url:
+        logger.info("이미 검색 결과 페이지에 있음 (URL에 keyword 포함)")
+        return
+    else:
+        home_page = HomePage(browser_session.page)
+        home_page.goto(search_url_value)
+        logger.info("검색 결과 페이지가 아님. 검색 페이지 url 로 이동")
+    
     logger.info(f"상품 검색 완료: {keyword}")
 
 
@@ -84,33 +91,6 @@ def search_results_page_is_displayed(browser_session):
     assert search_page.is_search_results_displayed(), "검색 결과 페이지가 표시되지 않았습니다"
     logger.info("검색 결과 페이지 표시 확인")
 
-
-@given("검색 결과 페이지가 표시된다")
-def search_results_page_is_displayed_given(browser_session):
-    """
-    검색 결과 페이지 상태 보장 (확인 + 필요시 생성)
-    
-    Args:
-        browser_session: BrowserSession 객체 (page 참조 관리)
-    """
-    search_page = SearchPage(browser_session.page)
-    
-    # 상태 확인
-    if search_page.is_search_results_displayed():
-        logger.info("이미 검색 결과 페이지에 있음")
-        return
-    
-    # 상태가 아니면 강제로 생성
-    logger.info("검색 결과 페이지가 아님. 검색 수행")
-    home_page = HomePage(browser_session.page)
-    # 기본 검색어 사용 (또는 설정에서 가져오기) - Atomic POM 조합
-    home_page.fill_search_input("노트북")
-    home_page.click_search_button()
-    home_page.wait_for_search_results()
-    
-    # 생성 후 확인
-    assert search_page.is_search_results_displayed(), "검색 결과 페이지 생성 실패"
-    logger.info("검색 결과 페이지 상태 보장 완료")
 
 
 @then(parsers.parse('검색 결과에 "{keyword}" 관련 상품이 포함되어 있다'))

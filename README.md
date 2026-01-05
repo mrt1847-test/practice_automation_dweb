@@ -44,6 +44,51 @@ playwright install
 playwright install chromium
 ```
 
+### 5. 환경 변수 설정 (.env 파일)
+
+프로젝트 루트에 `.env` 파일을 생성하고 회원 종류별 계정 정보를 설정하세요.
+
+**환경별 분기:**
+- `config.json`의 `environment` 설정에 따라 자동으로 분기됩니다
+- **dev 환경**: `DEV_` 접두사가 붙은 환경 변수 사용
+- **stg/prod 환경**: 접두사 없이 기본 환경 변수 사용 (stg와 prod는 동일한 계정 정보 사용)
+
+#### Stg/Prod 환경 설정 예시:
+```bash
+# .env 파일 (stg 또는 prod 환경 - config.json에서 "environment": "stg" 또는 "prod"로 설정)
+# 일반회원
+NORMAL_MEMBER_ID=일반회원아이디
+NORMAL_MEMBER_PASSWORD=일반회원비밀번호
+
+# 클럽회원
+CLUB_MEMBER_ID=클럽회원아이디
+CLUB_MEMBER_PASSWORD=클럽회원비밀번호
+
+# 사업자회원
+BUSINESS_MEMBER_ID=사업자회원아이디
+BUSINESS_MEMBER_PASSWORD=사업자회원비밀번호
+```
+
+#### Dev 환경 설정 예시:
+```bash
+# .env 파일 (dev 환경 - config.json에서 "environment": "dev"로 설정)
+# 일반회원
+DEV_NORMAL_MEMBER_ID=dev일반회원아이디
+DEV_NORMAL_MEMBER_PASSWORD=dev일반회원비밀번호
+
+# 클럽회원
+DEV_CLUB_MEMBER_ID=dev클럽회원아이디
+DEV_CLUB_MEMBER_PASSWORD=dev클럽회원비밀번호
+
+# 사업자회원
+DEV_BUSINESS_MEMBER_ID=dev사업자회원아이디
+DEV_BUSINESS_MEMBER_PASSWORD=dev사업자회원비밀번호
+```
+
+**주의:** 
+- `.env` 파일은 `.gitignore`에 포함되어 있어 Git에 커밋되지 않습니다. 실제 계정 정보를 안전하게 관리하세요.
+- `config.json`의 `environment` 값을 변경하면 자동으로 해당 환경의 계정 정보를 사용합니다.
+
 **참고:**
 - `pipenv install`을 실행하면 `Pipfile`과 `Pipfile.lock`이 생성됩니다
 - 이후 패키지 설치/업데이트는 `pipenv install <package>` 또는 `pipenv update`를 사용하세요

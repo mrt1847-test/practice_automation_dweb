@@ -5,6 +5,7 @@
 from pytest_bdd import given, when, then, parsers
 from pages.home_page import HomePage
 from pages.login_page import LoginPage
+from utils.credentials import MemberType
 import logging
 
 logger = logging.getLogger(__name__)
@@ -25,11 +26,9 @@ def user_is_logged_in(browser_session):
         logger.info("로그인되지 않음. 로그인 수행")
         home_page.click_login()
         
-        # 로그인 페이지에서 로그인 수행 (Atomic POM 조합)
+        # 로그인 페이지에서 로그인 수행 (기본: 일반회원)
         login_page = LoginPage(browser_session.page)
-        login_page.fill_username("t4adbuy01")
-        login_page.fill_password("Gmkt1004!!")
-        login_page.click_login_button()
+        login_page.login_as(MemberType.NORMAL)
         login_page.wait_for_login_complete()
     else:
         logger.info("이미 로그인되어 있음")
@@ -48,10 +47,36 @@ def user_clicks_login_button(browser_session):
     logger.info("로그인 버튼 클릭 완료")
 
 
+@when(parsers.parse('사용자가 "{member_type}"으로 로그인한다'))
+def user_logs_in_as_member_type(browser_session, member_type):
+    """
+    사용자가 회원 종류별로 로그인 (.env에서 계정 정보 읽어옴)
+    
+    Args:
+        browser_session: BrowserSession 객체 (page 참조 관리)
+        member_type: 회원 종류 (일반회원/클럽회원/사업자회원)
+    """
+    # 회원 종류 매핑
+    member_type_map = {
+        "일반회원": MemberType.NORMAL,
+        "클럽회원": MemberType.CLUB,
+        "사업자회원": MemberType.BUSINESS
+    }
+    
+    if member_type not in member_type_map:
+        raise ValueError(f"지원하지 않는 회원 종류입니다: {member_type}. (일반회원/클럽회원/사업자회원)")
+    
+    login_page = LoginPage(browser_session.page)
+    login_page.login_as(member_type_map[member_type])
+    login_page.wait_for_login_complete()
+    logger.info(f"{member_type}으로 로그인 완료")
+
+
 @when(parsers.parse('사용자가 아이디 "{username}" 비밀번호 "{password}"로 로그인한다'))
 def user_logs_in_with_credentials(browser_session, username, password):
     """
     사용자가 아이디와 비밀번호로 로그인 (Atomic POM 조합)
+    직접 계정 정보를 입력하는 경우 사용
     
     Args:
         browser_session: BrowserSession 객체 (page 참조 관리)

@@ -3,6 +3,7 @@ G마켓 로그인 페이지 객체
 """
 from pages.base_page import BasePage
 from playwright.sync_api import Page
+from utils.credentials import get_credentials, MemberType
 import logging
 
 logger = logging.getLogger(__name__)
@@ -41,6 +42,19 @@ class LoginPage(BasePage):
         """
         logger.debug("비밀번호 입력")
         self.fill("#typeMemberInputPassword", password)
+    
+    def login_as(self, member_type: str) -> None:
+        """
+        회원 종류별 로그인 (.env에서 계정 정보 읽어옴)
+        
+        Args:
+            member_type: 회원 종류 (normal/club/business)
+        """
+        credentials = get_credentials(member_type)
+        logger.info(f"{member_type} 회원으로 로그인 시도")
+        self.fill_username(credentials["username"])
+        self.fill_password(credentials["password"])
+        self.click_login_button()
     
     def click_login_button(self) -> None:
         """로그인 버튼 클릭"""
