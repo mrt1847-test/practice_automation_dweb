@@ -20,3 +20,8 @@ pytest-xdist>=3.8.0        # Parallel test execution
 # Utilities
 python-dotenv>=1.2.0       # Environment variables
 
+# OCR
+easyocr>=1.7.0             # EasyOCR for image text recognition
+opencv-python>=4.8.0       # Image processing
+Pillow>=10.0.0             # Image handling
+

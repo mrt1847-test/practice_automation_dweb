@@ -3,8 +3,13 @@
 """
 from pages.base_page import BasePage
 from playwright.sync_api import Page
-from typing import Optional
+from typing import Optional, Dict, List
 import logging
+import os
+import cv2
+import numpy as np
+from PIL import Image
+import easyocr
 
 logger = logging.getLogger(__name__)
 
@@ -148,4 +153,165 @@ class CheckoutPage(BasePage):
         # 클릭
         element.click(timeout=timeout)
         logger.info("결제하기 버튼 클릭 완료")
+    
+    def _get_smilepay_iframe(self):
+        """
+        스마일페이 iframe을 찾아서 반환
+        
+        Returns:
+            iframe의 content_frame
+        """
+        # iframe 찾기
+        iframes = self.page.locator("iframe").all()
+        if not iframes:
+            raise Exception("스마일페이 iframe을 찾을 수 없습니다.")
+        
+        # 첫 번째 iframe으로 전환
+        iframe = iframes[0]
+        iframe_frame = iframe.content_frame()
+        if not iframe_frame:
+            raise Exception("스마일페이 iframe content를 가져올 수 없습니다.")
+        
+        return iframe_frame
+    
+    def _analyze_smilepay_keypad_numbers(self, timeout: Optional[int] = None) -> List[str]:
+        """
+        스마일페이 비밀번호 입력 패드의 숫자 버튼들을 OCR로 분석하여 각 버튼의 숫자를 인식
+        
+        Args:
+            timeout: 타임아웃 (기본값: self.timeout)
+        
+        Returns:
+            숫자 버튼들의 인식된 숫자 리스트 (0-9, 백스페이스 등 11개)
+        """
+        timeout = timeout or self.timeout
+        logger.info("스마일페이 비밀번호 입력 패드 숫자 분석 시작")
+        
+        # 이미지 저장 디렉토리 생성
+        img_dir = "img"
+        os.makedirs(img_dir, exist_ok=True)
+        
+        # EasyOCR 리더 초기화 (한국어, 영어 지원)
+        reader = easyocr.Reader(['en', 'ko'], gpu=False)
+        
+        # iframe 가져오기
+        iframe_frame = self._get_smilepay_iframe()
+        
+        # 숫자 버튼 선택자 (KeyboardsNumbers__Grid__Item 클래스)
+        number_buttons = iframe_frame.locator(".KeyboardsNumbers__Grid__Item").all()
+        
+        if len(number_buttons) != 11:
+            logger.warning(f"예상된 11개의 버튼이 아닙니다. 발견된 버튼 수: {len(number_buttons)}")
+        
+        sm_num = []
+        
+        for i, button in enumerate(number_buttons):
+            try:
+                # 버튼이 보일 때까지 대기
+                button.wait_for(state="visible", timeout=timeout)
+                
+                # 버튼 스크린샷 찍기
+                screenshot_path = f"{img_dir}/number_{i+1}.png"
+                button.screenshot(path=screenshot_path, timeout=timeout)
+                
+                # 이미지 전처리 (OCR 정확도 향상)
+                img = cv2.imread(screenshot_path, cv2.IMREAD_GRAYSCALE)
+                if img is None:
+                    logger.warning(f"이미지를 읽을 수 없습니다: {screenshot_path}")
+                    sm_num.append(" ")
+                    continue
+                
+                # 이미지 리사이즈 및 전처리
+                img = cv2.resize(img, None, fx=1.5, fy=2.7, interpolation=cv2.INTER_CUBIC)
+                img = cv2.medianBlur(img, 3)
+                _, img = cv2.threshold(img, 128, 255, cv2.THRESH_BINARY)
+                img = cv2.convertScaleAbs(img, alpha=2, beta=0)  # 대비 강화
+                
+                # 전처리된 이미지 저장
+                processed_path = f"{img_dir}/grey_number_{i+1}.png"
+                cv2.imwrite(processed_path, img)
+                
+                # OCR로 숫자 인식 (여러 threshold로 시도하여 가장 많이 인식된 값 선택)
+                num_k = []
+                for threshold_multiplier in range(1, 6):
+                    text_threshold = 0.15 * threshold_multiplier
+                    try:
+                        recognized_text = reader.readtext(
+                            processed_path,
+                            text_threshold=text_threshold,
+                            allowlist='0123456789',
+                            detail=0
+                        )
+                        if recognized_text:
+                            # 리스트를 평탄화하고 숫자만 추출
+                            for text in recognized_text:
+                                if text and text.strip():
+                                    num_k.append(text.strip())
+                    except Exception as e:
+                        logger.debug(f"OCR 시도 {threshold_multiplier} 실패: {e}")
+                
+                # 가장 많이 인식된 숫자 선택
+                if num_k:
+                    # 빈도수 계산
+                    count_n = [num_k.count(num) for num in num_k]
+                    if count_n:
+                        max_index = count_n.index(max(count_n))
+                        read_text = num_k[max_index] if max_index < len(num_k) else " "
+                    else:
+                        read_text = " "
+                else:
+                    read_text = " "
+                
+                logger.debug(f"버튼 {i+1} 인식 결과: {read_text}")
+                sm_num.append(read_text)
+                
+            except Exception as e:
+                logger.warning(f"버튼 {i+1} 분석 실패: {e}")
+                sm_num.append(" ")
+        
+        logger.info(f"숫자 패드 분석 완료: {sm_num}")
+        return sm_num
+    
+    def enter_smilepay_password(self, password: str, timeout: Optional[int] = None) -> None:
+        """
+        스마일페이 비밀번호 입력 패드에서 비밀번호를 입력
+        
+        Args:
+            password: 입력할 비밀번호 (문자열)
+            timeout: 타임아웃 (기본값: self.timeout)
+        """
+        timeout = timeout or self.timeout
+        logger.info(f"스마일페이 비밀번호 입력 시작: {password}")
+        
+        # iframe 가져오기
+        iframe_frame = self._get_smilepay_iframe()
+        
+        # 숫자 패드 분석
+        sm_num = self._analyze_smilepay_keypad_numbers(timeout=timeout)
+        
+        # 비밀번호 각 자리 입력
+        for digit in password:
+            try:
+                # 인식된 숫자 배열에서 해당 숫자의 위치 찾기
+                if digit not in sm_num:
+                    raise ValueError(f"비밀번호 숫자 '{digit}'를 숫자 패드에서 찾을 수 없습니다. 인식된 숫자: {sm_num}")
+                
+                # 같은 숫자가 여러 개 있을 수 있으므로 첫 번째 인덱스 사용
+                button_index = sm_num.index(digit)
+                
+                # 해당 버튼 클릭
+                number_buttons = iframe_frame.locator(".KeyboardsNumbers__Grid__Item").all()
+                if button_index < len(number_buttons):
+                    button = number_buttons[button_index]
+                    button.wait_for(state="visible", timeout=timeout)
+                    button.click(timeout=timeout)
+                    logger.debug(f"숫자 '{digit}' 클릭 완료 (버튼 인덱스: {button_index})")
+                else:
+                    raise ValueError(f"버튼 인덱스 {button_index}가 유효하지 않습니다.")
+                
+            except Exception as e:
+                logger.error(f"숫자 '{digit}' 입력 실패: {e}")
+                raise
+        
+        logger.info("스마일페이 비밀번호 입력 완료")
     
