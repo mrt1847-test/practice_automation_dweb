@@ -26,6 +26,7 @@ pytest-rerunfailures = ">=16.0"
 pytest-timeout = ">=2.4.0"
 pytest-xdist = ">=3.8.0"
 python-dotenv = ">=1.2.0"
+easyocr = "*"
 
 [requires]
 python_version = "3.11"

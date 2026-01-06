@@ -39,6 +39,7 @@ def user_has_searched_product(browser_session, keyword):
     """
     search_url_value = search_url(keyword)
     current_url = browser_session.page.url
+    logger.info(current_url)
     if keyword in current_url:
         logger.info("이미 검색 결과 페이지에 있음 (URL에 keyword 포함)")
         return

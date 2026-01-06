@@ -199,9 +199,9 @@ def user_pays_with_method(browser_session, payment_method, pament_type):
     if payment_method == "스마일페이":
         checkout_page.select_payment_method("스마일페이")
     # 일반결제 하위 결제 방법 선택 (신용/체크카드, 해외발급 신용카드, 무통장 입금, 휴대폰 소액결제)
-    elif payment_method == "일반결제":
+    elif payment_method == "일반 결제":
         # 먼저 일반결제 선택
-        checkout_page.select_payment_method("일반결제")
+        checkout_page.select_payment_method("일반 결제")
         # 그 다음 하위 결제 방법 선택
         checkout_page.select_normal_payment_method(payment_method)
 
