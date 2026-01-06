@@ -31,6 +31,7 @@ class PlaywrightSharedState:
     current_feature_name = None
     feature_page = None  # feature 단위로 공유되는 page
     feature_browser_session = None  # feature 단위로 공유되는 browser_session
+    bdd_context = None  # bdd_context 참조 (feature 변경 시 store 초기화용)
 
 # 브라우저 fixture (세션 단위, 한 번만 실행)
 @pytest.fixture(scope="session", autouse=True)
@@ -191,12 +192,18 @@ def bdd_context():
     시나리오 내 스텝 간 데이터 공유를 위한 전용 객체
     같은 feature 파일 내의 모든 시나리오가 같은 context를 공유 (module scope)
     이름 충돌이 없고, 시나리오 메타데이터와 비즈니스 데이터를 분리해서 관리
+    
+    주의: test_features.py에서 여러 feature를 로드하므로 모든 feature가 같은 module로 인식됨
+    따라서 pytest_bdd_before_scenario hook에서 feature 변경 시 store를 리셋해야 함
     """
     class Context:
         def __init__(self):
             self.store = {}
     
-    return Context()
+    context = Context()
+    # PlaywrightSharedState에 참조 저장 (feature 변경 시 초기화용)
+    PlaywrightSharedState.bdd_context = context
+    return context
 
 
 # pytest_bdd_before_scenario 훅 사용 (pytest-bdd에서 지원하는 훅)
@@ -229,6 +236,16 @@ def pytest_bdd_before_scenario(request, feature, scenario):
             PlaywrightSharedState.context = None
         
         PlaywrightSharedState.feature_browser_session = None
+        
+        # bdd_context.store 초기화 (feature 변경 시)
+        # test_features.py에서 여러 feature를 로드하므로 scope="module"인 bdd_context는
+        # 모든 feature에 걸쳐 같은 인스턴스를 공유하므로 명시적으로 리셋 필요
+        if PlaywrightSharedState.bdd_context:
+            try:
+                PlaywrightSharedState.bdd_context.store.clear()
+                logger.info(f"bdd_context.store 초기화 완료 (feature 변경: {PlaywrightSharedState.current_feature_name} → {feature.name})")
+            except Exception as e:
+                logger.warning(f"bdd_context.store 초기화 중 오류: {e}")
         
         # 새 Feature를 위한 깨끗한 컨텍스트(브라우저 환경) 생성
         PlaywrightSharedState.context = PlaywrightSharedState.browser.new_context(

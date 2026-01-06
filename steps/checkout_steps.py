@@ -182,7 +182,7 @@ def user_selects_payment_method(browser_session):
     logger.info("결제 방법 선택")
 
 
-@when(parsers.parse('사용자가 "{payment_method}"의 "{pament_type}" 으로 결제한다'))
+@when(parsers.parse('사용자가 "{payment_method}"의 "{pament_type}" 을 선택한다'))
 def user_pays_with_method(browser_session, payment_method, pament_type):
     """
     사용자가 특정 결제 방법으로 결제
@@ -199,13 +199,12 @@ def user_pays_with_method(browser_session, payment_method, pament_type):
     if payment_method == "스마일페이":
         checkout_page.select_payment_method("스마일페이")
     # 일반결제 하위 결제 방법 선택 (신용/체크카드, 해외발급 신용카드, 무통장 입금, 휴대폰 소액결제)
-    elif payment_method in ["신용/체크카드", "해외발급 신용카드", "무통장 입금", "휴대폰 소액결제"]:
+    elif payment_method == "일반결제":
         # 먼저 일반결제 선택
         checkout_page.select_payment_method("일반결제")
         # 그 다음 하위 결제 방법 선택
         checkout_page.select_normal_payment_method(payment_method)
-        # 은행 종류 선택
-        checkout_page.select_bank_type(pament_type)
+
     
     logger.info(f"결제 방법 선택: {payment_method}")
 
@@ -316,10 +315,6 @@ def user_creates_order_with_bank_transfer(browser_session, bank_name):
     checkout_page = CheckoutPage(actual_page)
     actual_page.wait_for_load_state("networkidle")
     
-    # 일반결제 선택
-    checkout_page.select_payment_method("일반 결제")
-    # 무통장 입금 선택
-    checkout_page.select_normal_payment_method("무통장 입금")
     # 은행 종류 선택
     checkout_page.select_bank_type(bank_name)
     # 주문 완료

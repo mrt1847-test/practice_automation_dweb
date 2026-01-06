@@ -3,12 +3,10 @@
 """
 from pages.base_page import BasePage
 from playwright.sync_api import Page
-from typing import Optional, Dict, List
+from typing import Optional, List
 import logging
-import os
 import cv2
 import numpy as np
-from PIL import Image
 import easyocr
 
 logger = logging.getLogger(__name__)
@@ -187,10 +185,6 @@ class CheckoutPage(BasePage):
         timeout = timeout or self.timeout
         logger.info("스마일페이 비밀번호 입력 패드 숫자 분석 시작")
         
-        # 이미지 저장 디렉토리 생성
-        img_dir = "img"
-        os.makedirs(img_dir, exist_ok=True)
-        
         # EasyOCR 리더 초기화 (한국어, 영어 지원)
         reader = easyocr.Reader(['en', 'ko'], gpu=False)
         
@@ -210,14 +204,15 @@ class CheckoutPage(BasePage):
                 # 버튼이 보일 때까지 대기
                 button.wait_for(state="visible", timeout=timeout)
                 
-                # 버튼 스크린샷 찍기
-                screenshot_path = f"{img_dir}/number_{i+1}.png"
-                button.screenshot(path=screenshot_path, timeout=timeout)
+                # 버튼 스크린샷을 bytes로 가져오기 (파일 저장 없이)
+                screenshot_bytes = button.screenshot(timeout=timeout)
                 
-                # 이미지 전처리 (OCR 정확도 향상)
-                img = cv2.imread(screenshot_path, cv2.IMREAD_GRAYSCALE)
+                # bytes를 numpy 배열로 변환
+                nparr = np.frombuffer(screenshot_bytes, np.uint8)
+                img = cv2.imdecode(nparr, cv2.IMREAD_GRAYSCALE)
+                
                 if img is None:
-                    logger.warning(f"이미지를 읽을 수 없습니다: {screenshot_path}")
+                    logger.warning(f"이미지를 디코딩할 수 없습니다: 버튼 {i+1}")
                     sm_num.append(" ")
                     continue
                 
@@ -227,17 +222,13 @@ class CheckoutPage(BasePage):
                 _, img = cv2.threshold(img, 128, 255, cv2.THRESH_BINARY)
                 img = cv2.convertScaleAbs(img, alpha=2, beta=0)  # 대비 강화
                 
-                # 전처리된 이미지 저장
-                processed_path = f"{img_dir}/grey_number_{i+1}.png"
-                cv2.imwrite(processed_path, img)
-                
-                # OCR로 숫자 인식 (여러 threshold로 시도하여 가장 많이 인식된 값 선택)
+                # OCR로 숫자 인식 (numpy 배열 직접 전달, 여러 threshold로 시도하여 가장 많이 인식된 값 선택)
                 num_k = []
                 for threshold_multiplier in range(1, 6):
                     text_threshold = 0.15 * threshold_multiplier
                     try:
                         recognized_text = reader.readtext(
-                            processed_path,
+                            img,  # numpy 배열 직접 전달
                             text_threshold=text_threshold,
                             allowlist='0123456789',
                             detail=0
