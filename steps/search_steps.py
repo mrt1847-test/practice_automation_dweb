@@ -7,6 +7,7 @@ from playwright.sync_api import expect
 from pages.home_page import HomePage
 from pages.search_page import SearchPage
 from utils.urls import search_url
+from urllib.parse import quote
 import logging
 
 logger = logging.getLogger(__name__)
@@ -39,13 +40,16 @@ def user_has_searched_product(browser_session, keyword):
     """
     search_url_value = search_url(keyword)
     current_url = browser_session.page.url
-    if keyword in current_url:
+    
+    # URL에 keyword가 인코딩된 형태든 인코딩되지 않은 형태든 포함되어 있는지 확인
+    if keyword in current_url or quote(keyword, safe='') in current_url:
         logger.info("이미 검색 결과 페이지에 있음 (URL에 keyword 포함)")
         return
-    else:
-        home_page = HomePage(browser_session.page)
-        home_page.goto(search_url_value)
-        logger.info("검색 결과 페이지가 아님. 검색 페이지 url 로 이동")
+    
+    # 검색 결과 페이지가 아니면 이동
+    home_page = HomePage(browser_session.page)
+    home_page.goto(search_url_value)
+    logger.info("검색 결과 페이지가 아님. 검색 페이지 url 로 이동")
     
     logger.info(f"상품 검색 완료: {keyword}")
 
