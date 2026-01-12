@@ -356,7 +356,7 @@ def user_fill_nonmember_info(browser_session):
     browser_session.page.wait_for_load_state("networkidle")
 
     #주문 정보 입력
-    checkout_page.fill_nonmember_info("김찬휘","01094294226","cksgnl777naver.com","gk12")
+    checkout_page.fill_nonmember_info("김찬휘","01094294226","cksgnl777naver.com","gksksla12")
     
     #주문자 정보 동일 체크
     checkout_page.check_equalName()
@@ -409,7 +409,7 @@ def user_fill_bank_account(browser_session, bank_name):
     
     # 주문 완료
     checkout_page.click_order_button()
-    logger.info("계좌정보 입력 완료")
+    logger.info("주문 생성 완료")
 
 
     
