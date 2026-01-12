@@ -194,34 +194,32 @@ graph TD
 
 ```mermaid
 graph TB
-    %% ===== Style Definitions =====
-    classDef l1 fill:#f1f5f9,stroke:#334155,stroke-width:1.5px
-    classDef l2 fill:#e8f1f8,stroke:#1e40af,stroke-width:1.5px
-    classDef l3 fill:#f0fdf4,stroke:#166534,stroke-width:1.5px
-    classDef l4 fill:#fffbeb,stroke:#92400e,stroke-width:1.5px
-    classDef ext fill:#f8fafc,stroke:#475569,stroke-dasharray:5 5
-    classDef cfg fill:#ffffff,stroke:#94a3b8,stroke-dasharray:3 3
+    %% ===== Style Definitions (심플한 무채색 설정) =====
+    classDef default fill:#ffffff,stroke:#000000,stroke-width:1.5px
+    classDef layer fill:#f8fafc,stroke:#000000,stroke-width:2px,font-weight:bold
+    classDef ext fill:#ffffff,stroke:#000000,stroke-width:1.5px,stroke-dasharray: 5 5
+    classDef cfg fill:#ffffff,stroke:#000000,stroke-width:1px,stroke-dasharray: 2 2
 
     %% ===== Layers =====
-    subgraph L1["L1 · 비즈니스 계층"]
+    subgraph L1["📝 L1 · 비즈니스 계층"]
         F1(Feature Files<br/>Gherkin 시나리오)
     end
 
-    subgraph L2["L2 · 행위 계층"]
+    subgraph L2["🔗 L2 · 행위 계층"]
         S1(Step Definitions<br/>@given @when @then)
     end
 
-    subgraph L3["L3 · 객체 계층"]
-        P1(Page Objects)
+    subgraph L3["🎯 L3 · 객체 계층"]
+        P1(Page Objects<br/>home_page, login_page 등)
     end
 
-    subgraph L4["L4 · 엔진 계층"]
-        E1(Pytest Fixtures & Hooks)
+    subgraph L4["⚙️ L4 · 엔진 계층"]
+        E1(Pytest Fixtures & Hooks<br/>conftest.py)
         E2(Playwright Shared State)
         E1 --> E2
     end
 
-    subgraph EXT["외부 시스템 연동"]
+    subgraph EXT["📊 외부 시스템 연동"]
         TR1(TestRail Session Hook)
         TR2(TestRail API)
         TR1 --> TR2
@@ -229,8 +227,8 @@ graph TB
 
     %% ===== Flow =====
     L1 --> L2 --> L3 --> E2
-    L1 -.->|케이스 ID 매핑| TR1
-    E2 -.->|테스트 증적| TR1
+    L1 -.->|ID 매핑| TR1
+    E2 -.->|테스트 증적 데이터| TR1
 
     %% ===== Config =====
     Config(Config / Utils)
@@ -238,12 +236,15 @@ graph TB
     Config -.-> P1
     Config -.-> E1
 
-    %% ===== Class Mapping =====
-    class L1,F1 l1
-    class L2,S1 l2
-    class L3,P1 l3
-    class L4,E1,E2 l4
-    class EXT,TR1,TR2 ext
+    %% ===== Apply Styles =====
+    style L1 fill:#ffffff,stroke:#000000,stroke-width:2px
+    style L2 fill:#ffffff,stroke:#000000,stroke-width:2px
+    style L3 fill:#ffffff,stroke:#000000,stroke-width:2px
+    style L4 fill:#ffffff,stroke:#000000,stroke-width:2px
+    style EXT fill:#ffffff,stroke:#000000,stroke-width:1.5px,stroke-dasharray: 5 5
+    
+    class F1,S1,P1,E1,E2 default
+    class TR1,TR2 ext
     class Config cfg
 ```
 
