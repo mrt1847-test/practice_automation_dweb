@@ -12,7 +12,7 @@ pytest_plugins = [
 
 import shutil
 from playwright.sync_api import sync_playwright, Browser, BrowserContext, Page
-# from src.gtas_python_core_v2.gtas_python_core_vault_v2 import Vault
+from src.gtas_python_core_v2.gtas_python_core_vault_v2 import Vault
 import os
 import pytest
 import requests
