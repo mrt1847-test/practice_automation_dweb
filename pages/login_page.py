@@ -80,3 +80,7 @@ class LoginPage(BasePage):
         """
         return self.is_visible("text='로그아웃'", timeout=5000)
 
+    def click_nonmember_button(self) -> None:
+        """비회원 버튼 클릭"""
+        logger.debug("비회원 버튼 클릭")
+        self.click("#btn__order-nonmember")

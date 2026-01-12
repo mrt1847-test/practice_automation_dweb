@@ -10,12 +10,19 @@ import numpy as np
 import easyocr
 
 logger = logging.getLogger(__name__)
+alert_detected = {"status": False, "message": ""}
+
+def handle_dialog(dialog):
+    alert_detected["status"] = True
+    alert_detected["message"] = dialog.message
+    dialog.accept()
 
 
 class CheckoutPage(BasePage):
     """주문서 페이지"""
     
     # 선택자 정의
+    
     
     def __init__(self, page: Page):
         """
@@ -25,6 +32,8 @@ class CheckoutPage(BasePage):
             page: Playwright Page 객체
         """
         super().__init__(page)
+
+
 
     def is_checkout_page_displayed(self) -> bool:
         """주문서 페이지가 표시되었는지 확인"""
@@ -105,7 +114,7 @@ class CheckoutPage(BasePage):
         logger.debug(f"은행 종류 선택: {bank_type}")
         
         # 요소 찾기
-        element = self.get_by_text(bank_type)
+        element = self.get_by_role("button",name = bank_type)
         
         # 요소가 나타날 때까지 대기
         element.wait_for(state="attached", timeout=timeout)
@@ -134,7 +143,9 @@ class CheckoutPage(BasePage):
         logger.debug("결제하기 버튼 클릭")
         
         # 요소 찾기
-        element = self.get_by_text("결제하기")
+
+        element = self.get_by_role("button",name = "결제하기")
+        # element = self.get_by_text("결제하기")
         
         # 요소가 나타날 때까지 대기
         element.wait_for(state="attached", timeout=timeout)
@@ -147,9 +158,19 @@ class CheckoutPage(BasePage):
         # 요소가 보일 때까지 대기
         element.wait_for(state="visible", timeout=timeout)
         logger.debug("결제하기 버튼 표시 확인")
+
+        self.page.on("dialog", handle_dialog)
+
+        element.click()
         
-        # 클릭
-        element.click(timeout=timeout)
+        # 잠깐 대기 (네트워크/응답 시간)
+        self.page.wait_for_timeout(2000)
+
+        # 검증: 얼럿이 감지되었다면 실패 처리
+        if alert_detected["status"]:
+            raise AssertionError(f"비정상 얼럿 감지: {alert_detected['message']}")
+        
+        # 감지 안 됐다면 정상 통과
         logger.info("결제하기 버튼 클릭 완료")
     
     def _get_smilepay_iframe(self):
@@ -305,4 +326,144 @@ class CheckoutPage(BasePage):
                 raise
         
         logger.info("스마일페이 비밀번호 입력 완료")
+
+    def fill_nonmember_info(self, buyername: str, phonenumber: str, email: str, password: str) -> None:
+        """
+        비회원 정보 입력
+        
+        Args:
+            buyername: 구매자명
+            phonenumber: 전화번호
+            email: 구매자 이메일
+            password: 구매자 비밀번호
+        """
+        
+        self.fill("#xo_id_buyer_name", buyername)
+        logger.debug(f"구매자명 입력: {buyername}")
+        
+        self.fill("#xo_id_buyer_phone_number", phonenumber)
+        logger.debug(f"전화번호 입력: {phonenumber}")
+        
+        self.fill("#xo_id_buyer_email", email)
+        logger.debug(f"이메일 입력: {email}")
+        
+        self.fill("#xo_id_non_member_password", password)
+        logger.debug(f"비밀번호 입력: {password}")
+        
+        self.fill("#xo_id_non_member_password_confirm", password)
+        logger.debug(f"비밀번호 확인 입력: {password}")
+
+        logger.info("구매자 정보 입력 완료")
+            
+    def check_agreInfoAll(self) -> None:
+        """전체동의 체크"""
+        
+        self.locator('label[for="agreeInfoAllTop"]').click()
+        logger.info("전체동의 체크 완료")
+        
+    def check_equalName(self) -> None:
+        """주문자 정보와 동일 체크"""
+        
+        self.locator('label[for="equal-name2"]').click()
+        logger.info("주문자 정보와 동일 체크 완료")
+        
     
+    def _get_address_iframe(self):
+        """
+        주소찾기 iframe을 찾아서 반환
+        
+        Returns:
+            iframe의 content_frame
+        """
+        # iframe 찾기
+        iframes = self.page.locator("iframe").all()
+        if not iframes:
+            raise Exception("주소찾기 iframe을 찾을 수 없습니다.")
+        
+        # 첫 번째 iframe으로 전환
+        iframe = iframes[0]
+        iframe_frame = iframe.content_frame()
+        if not iframe_frame:
+            raise Exception("주소찾기 iframe content를 가져올 수 없습니다.")
+        
+        return iframe_frame
+
+
+    def click_find_address(self) -> None:
+        """
+        비회원 주소찾기 버튼 클릭
+        
+        """
+        
+        self.click(".button__address-search")
+        logger.info("주소찾기 버튼 클릭 완료")
+
+
+    def fill_address(self, address: str) -> None:
+        """
+        주소 찾기
+        
+        Args:
+            address: 주소
+        """
+        iframes = self.page.frame_locator('[title = "주소찾기"]')
+
+        iframes.locator(".input_search").fill(address)
+        logger.debug(f"주소: {address}")
+        
+        iframes.locator(".ico_search").click()
+        logger.debug("찾기 버튼")
+        
+        iframes.locator("#text_address_1_0").click()
+        logger.debug("첫번째 주소")
+        
+        iframes.locator(".btn_set").click()        
+        logger.info("주소 선택 클릭 완료")
+
+
+    
+    def fill_detail_address(self, address: str, timeout: Optional[int] = None) -> None:
+        """
+        주소 찾기
+        
+        Args:
+            address: 상세주소
+        """
+        timeout = timeout or self.timeout
+        logger.debug(f"입력주소: {address}")        
+
+
+        self.fill('[title = "상세주소 입력"]', address)
+        logger.debug(f"주소: {address}") 
+
+        logger.info("상세주소 입력 완료")
+        
+        
+    def fill_bank_account(self, number: str, name: str) -> None:
+        """
+        은행 계좌번호 입력
+        
+        Args:
+            number: 계좌번호
+            name: 예금주명
+        """
+        self.fill("#xo_id_refund_account_number", number)
+        logger.debug(f"계좌번호: {number}")
+            
+        self.fill("#xo_id_refund_account_owner_name", name)
+        logger.debug(f"이름: {name}")
+        
+        with self.page.expect_event("dialog") as dialog_info:
+            self.click("#xo_id_refund_account_confirm_button")
+    
+        dialog = dialog_info.value
+        dialog.accept()
+
+        logger.info("계좌확인 클릭 완료")
+
+    def get_error_messages(self) -> None:
+        # 해당 클래스의 모든 텍스트를 리스트로 가져옴
+        error_messages = self.locator(".text__error-message").all_inner_texts()
+        # 에러 메시지 리스트가 비어있어야(False) 테스트 통과
+        # 만약 메시지가 있다면(True) AssertionError 발생
+        assert not error_messages, f"구매자 입력 정보 오류: {'//'.join(error_messages)}"
