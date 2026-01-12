@@ -445,13 +445,7 @@ class CheckoutPage(BasePage):
     def get_error_messages(self) -> None:
         # 해당 클래스의 모든 텍스트를 리스트로 가져옴
         error_messages = self.locator(".text__error-message").all_inner_texts()
-
-        # 1. 에러 메시지가 존재하는지 확인 (리스트가 비어있지 않은 경우)
-        if error_messages:
-            # 메시지들을 콤마로 연결하여 에러 발생
-            error_text = ",".join(error_messages)
-            raise Exception(f"발견된 에러: {error_text}")
-    
-    # 2. 에러 메시지가 없는 경우
-        else:
-            logger.info("에러 메시지 없음")
+        # 에러 메시지 리스트가 비어있어야(False) 테스트 통과
+        # 만약 메시지가 있다면(True) AssertionError 발생
+        assert not error_messages, f"구매자 입력 정보 오류: {'//'.join(error_messages)}"
+   
