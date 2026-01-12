@@ -333,18 +333,20 @@ class CheckoutPage(BasePage):
         
         self.fill("#xo_id_non_member_password_confirm", password)
         logger.debug(f"비밀번호 확인 입력: {password}")
+
+        logger.info("구매자 정보 입력 완료")
             
     def check_agreInfoAll(self) -> None:
         """전체동의 체크"""
         
         self.locator('label[for="agreeInfoAllTop"]').click()
-        logger.info("전체동의")
+        logger.info("전체동의 체크 완료")
         
     def check_equalName(self) -> None:
         """주문자 정보와 동일 체크"""
         
         self.locator('label[for="equal-name2"]').click()
-        logger.info("주문자 정보와 동일")
+        logger.info("주문자 정보와 동일 체크 완료")
         
     
     def _get_address_iframe(self):
@@ -375,7 +377,7 @@ class CheckoutPage(BasePage):
         """
         
         self.click(".button__address-search")
-        logger.info("주소찾기 버튼")
+        logger.info("주소찾기 버튼 클릭 완료")
 
 
     def fill_address(self, address: str) -> None:
@@ -397,23 +399,25 @@ class CheckoutPage(BasePage):
         logger.debug("첫번째 주소")
         
         iframes.locator(".btn_set").click()        
-        logger.info("주소 선택 확인")
+        logger.info("주소 선택 클릭 완료")
 
 
     
-    def fill_address2(self, address2: str, timeout: Optional[int] = None) -> None:
+    def fill_detail_address(self, address: str, timeout: Optional[int] = None) -> None:
         """
         주소 찾기
         
         Args:
-            address2: 상세주소
+            address: 상세주소
         """
         timeout = timeout or self.timeout
-        logger.debug(f"입력주소: {address2}")        
+        logger.debug(f"입력주소: {address}")        
 
 
-        self.fill('[title = "상세주소 입력"]', address2)
-        logger.debug(f"주소: {address2}") 
+        self.fill('[title = "상세주소 입력"]', address)
+        logger.debug(f"주소: {address}") 
+
+        logger.info("상세주소 입력 완료")
         
         
     def fill_bank_account(self, number: str, name: str) -> None:
@@ -436,5 +440,18 @@ class CheckoutPage(BasePage):
         dialog = dialog_info.value
         dialog.accept()
 
-        logger.info("계좌확인")
+        logger.info("계좌확인 클릭 완료")
 
+    def get_error_messages(self) -> None:
+        # 해당 클래스의 모든 텍스트를 리스트로 가져옴
+        error_messages = self.locator(".text__error-message").all_inner_texts()
+
+        # 1. 에러 메시지가 존재하는지 확인 (리스트가 비어있지 않은 경우)
+        if error_messages:
+            # 메시지들을 콤마로 연결하여 에러 발생
+            error_text = ",".join(error_messages)
+            raise Exception(f"발견된 에러: {error_text}")
+    
+    # 2. 에러 메시지가 없는 경우
+        else:
+            logger.info("에러 메시지 없음")

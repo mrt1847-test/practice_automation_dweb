@@ -356,7 +356,7 @@ def user_fill_nonmember_info(browser_session):
     browser_session.page.wait_for_load_state("networkidle")
 
     #주문 정보 입력
-    checkout_page.fill_nonmember_info("김찬휘","01094294226","cksgnl777@naver.com","gksksla12")
+    checkout_page.fill_nonmember_info("김찬휘","01094294226","cksgnl777naver.com","gk12")
     
     #주문자 정보 동일 체크
     checkout_page.check_equalName()
@@ -364,12 +364,16 @@ def user_fill_nonmember_info(browser_session):
     logger.info("주문정보 입력 완료")
 
 @then("비회원 주문정보가 정상적으로 입력 되었다")
-def check_nonmember_info(broser_session):
+def check_nonmember_info(browser_session):
     # TODO 비회원 주문정보 정상 입력 확인 로직 구현
+    checkout_page = CheckoutPage(browser_session.page)
+    browser_session.page.wait_for_load_state("networkidle")
+    checkout_page.get_error_messages()
+    
     logger.info("비회원 주문정로 정상입력 확인")
 
-@when(parsers.parse('사용자가 주소 "{address}"와 상세주소 "{address2}"를 입력한다'))
-def user_fill_address_info(browser_session, address, address2):
+@when(parsers.parse('사용자가 주소 "{address}"와 상세주소 "{detailAddress}"를 입력한다'))
+def user_fill_address_info(browser_session, address, detailAddress):
     """
     사용자가 주소 입력
 
@@ -380,7 +384,7 @@ def user_fill_address_info(browser_session, address, address2):
     browser_session.page.wait_for_load_state("networkidle")
     checkout_page.click_find_address()
     checkout_page.fill_address(address)
-    checkout_page.fill_address2(address2)
+    checkout_page.fill_detail_address(detailAddress)
     logger.info("주소 입력 완료")
 
 @then("주소가 정상적으로 입력 되었다")
@@ -406,5 +410,6 @@ def user_fill_bank_account(browser_session, bank_name):
     # 주문 완료
     checkout_page.click_order_button()
     logger.info("계좌정보 입력 완료")
+
 
     
