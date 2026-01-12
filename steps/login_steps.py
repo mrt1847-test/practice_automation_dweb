@@ -128,3 +128,59 @@ def logout_is_completed(browser_session):
     home_page = HomePage(browser_session.page)
     assert not home_page.is_logged_in(), "로그아웃에 실패했습니다"
     logger.info("로그아웃 완료 확인")
+
+
+@when("사용자가 비회원으로 구매하기 버튼을 클릭한다")
+def user_click_nonmember_button(browser_session):
+    """
+    사용자가 비회원으로 구매하기 버튼 클릭
+    
+    Args:
+        browser_session: BrowserSession 객체 (page 참조 관리)
+    """
+    actual_page = browser_session.page
+    login_page = LoginPage(actual_page)
+    actual_page.wait_for_load_state("networkidle")
+
+    login_page.click_nonmember_button()
+    logger.info("비회원으로 구매하기 버튼 클릭 완료")
+
+@then("로그인 페이지가 표시된다")
+def loginpage_is_displayed(browser_session):
+    """
+    로그인 페이지가 올바르게 표시되는지 확인
+    
+    Args:
+        browser_session: BrowserSession 객체 (page 참조 관리)
+    """
+    # TODO: 로그인 페이지 특정 요소 확인 로직 구현
+    logger.info("로그인 페이지 표시 확인")
+
+@given("로그인 페이지가 표시된다")
+def loginpage_is_displayed(browser_session):
+    """
+    로그인 페이지가 올바르게 표시되는지 확인
+    
+    Args:
+        browser_session: BrowserSession 객체 (page 참조 관리)
+    """
+    # TODO: 로그인 페이지 특정 요소 확인 로직 구현
+    logger.info("로그인 페이지 표시 확인")
+
+@given("사용자가 로그아웃되어 있다")
+def user_is_logged_in(browser_session):
+    """
+    사용자가 로그아웃 상태인지 확인하고, 로그인되어 있으면 로그아웃 수행
+    
+    Args:
+        browser_session: BrowserSession 객체 (page 참조 관리)
+    """
+    home_page = HomePage(browser_session.page)
+    
+    # 이미 로그인되어 있는지 확인
+    if home_page.is_logged_in():
+        logger.info("로그인되어있음. 로그아웃 수행")
+        home_page.click_logout()
+        
+    else:
+        logger.info("이미 로그아웃되어 있음")

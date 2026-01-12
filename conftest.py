@@ -12,7 +12,7 @@ pytest_plugins = [
 
 import shutil
 from playwright.sync_api import sync_playwright, Browser, BrowserContext, Page
-from src.gtas_python_core_v2.gtas_python_core_vault_v2 import Vault
+# from src.gtas_python_core_v2.gtas_python_core_vault_v2 import Vault
 import os
 import pytest
 import requests
@@ -274,7 +274,7 @@ def pytest_bdd_before_scenario(request, feature, scenario):
     
     # 각 시나리오 시작 시 로그 핸들러 초기화 (이전 시나리오의 로그 제거)
     # pytest_runtest_setup보다 먼저 실행되므로 여기서 초기화하는 것이 안전함
-    test_log_handler.clear()
+    # test_log_handler.clear()
 
 
 # STATE_PATH = "state.json"
@@ -415,490 +415,490 @@ except FileNotFoundError:
 except json.JSONDecodeError as e:
     raise RuntimeError(f"config.json 파일의 JSON 형식이 잘못되었습니다: {e}")
 
-# 환경변수 기반 설정
-try:
-    TESTRAIL_BASE_URL = config['tr_url']
-    TESTRAIL_PROJECT_ID = config['project_id']
-    TESTRAIL_SUITE_ID = config['suite_id']
-    TESTRAIL_SECTION_ID = config['section_id']
-    TESTRAIL_MILESTONE_ID = config['milestone_id']
-except KeyError as e:
-    raise RuntimeError(f"config.json에 필수 키 '{e}'가 없습니다.")
+# # 환경변수 기반 설정
+# try:
+#     TESTRAIL_BASE_URL = config['tr_url']
+#     TESTRAIL_PROJECT_ID = config['project_id']
+#     TESTRAIL_SUITE_ID = config['suite_id']
+#     TESTRAIL_SECTION_ID = config['section_id']
+#     TESTRAIL_MILESTONE_ID = config['milestone_id']
+# except KeyError as e:
+#     raise RuntimeError(f"config.json에 필수 키 '{e}'가 없습니다.")
 
-try:
-    vault_credentials = Vault("gmarket").get_Kv_credential("authentication/testrail/automation")
-    TESTRAIL_USER = vault_credentials.get("username")
-    TESTRAIL_TOKEN = vault_credentials.get("password")
-    if not TESTRAIL_USER or not TESTRAIL_TOKEN:
-        raise RuntimeError("TestRail 인증 정보(username 또는 password)가 없습니다.")
-except Exception as e:
-    raise RuntimeError(f"TestRail 인증 정보를 가져오는 중 오류 발생: {e}")
-testrail_run_id = None
-case_id_map = {}  # {섹션 이름: [케이스ID 리스트]}
-test_logs = {}  # {nodeid: 로그 문자열} - 테스트별 로그 저장
-current_test_nodeid = None  # 현재 실행 중인 테스트의 nodeid
-
-
-def testrail_get(endpoint):
-    url = f"{TESTRAIL_BASE_URL}/index.php?/api/v2/{endpoint}"
-    r = requests.get(url, auth=(TESTRAIL_USER, TESTRAIL_TOKEN))
-    r.raise_for_status()
-    return r.json()
+# try:
+#     vault_credentials = Vault("gmarket").get_Kv_credential("authentication/testrail/automation")
+#     TESTRAIL_USER = vault_credentials.get("username")
+#     TESTRAIL_TOKEN = vault_credentials.get("password")
+#     if not TESTRAIL_USER or not TESTRAIL_TOKEN:
+#         raise RuntimeError("TestRail 인증 정보(username 또는 password)가 없습니다.")
+# except Exception as e:
+#     raise RuntimeError(f"TestRail 인증 정보를 가져오는 중 오류 발생: {e}")
+# testrail_run_id = None
+# case_id_map = {}  # {섹션 이름: [케이스ID 리스트]}
+# test_logs = {}  # {nodeid: 로그 문자열} - 테스트별 로그 저장
+# current_test_nodeid = None  # 현재 실행 중인 테스트의 nodeid
 
 
-def testrail_post(endpoint, payload=None, files=None):
-    url = f"{TESTRAIL_BASE_URL}/index.php?/api/v2/{endpoint}"
-    if files:
-        r = requests.post(url, auth=(TESTRAIL_USER, TESTRAIL_TOKEN), files=files)
-    else:
-        r = requests.post(url, auth=(TESTRAIL_USER, TESTRAIL_TOKEN), json=payload)
-    r.raise_for_status()
-    return r.json()
+# def testrail_get(endpoint):
+#     url = f"{TESTRAIL_BASE_URL}/index.php?/api/v2/{endpoint}"
+#     r = requests.get(url, auth=(TESTRAIL_USER, TESTRAIL_TOKEN))
+#     r.raise_for_status()
+#     return r.json()
+
+
+# def testrail_post(endpoint, payload=None, files=None):
+#     url = f"{TESTRAIL_BASE_URL}/index.php?/api/v2/{endpoint}"
+#     if files:
+#         r = requests.post(url, auth=(TESTRAIL_USER, TESTRAIL_TOKEN), files=files)
+#     else:
+#         r = requests.post(url, auth=(TESTRAIL_USER, TESTRAIL_TOKEN), json=payload)
+#     r.raise_for_status()
+#     return r.json()
 
 
 
 
-def get_all_subsection_ids(parent_section_id, all_sections):
-    """
-    지정된 섹션 ID와 모든 하위 섹션 ID를 재귀적으로 찾기
+# def get_all_subsection_ids(parent_section_id, all_sections):
+#     """
+#     지정된 섹션 ID와 모든 하위 섹션 ID를 재귀적으로 찾기
     
-    Args:
-        parent_section_id: 부모 섹션 ID (int 또는 str)
-        all_sections: 모든 섹션 리스트 (TestRail API에서 가져온 전체 섹션)
+#     Args:
+#         parent_section_id: 부모 섹션 ID (int 또는 str)
+#         all_sections: 모든 섹션 리스트 (TestRail API에서 가져온 전체 섹션)
     
-    Returns:
-        list: 부모 섹션 ID와 모든 하위 섹션 ID 리스트
-    """
-    # 타입 통일 (정수로 변환)
-    if isinstance(parent_section_id, str):
-        try:
-            parent_section_id = int(parent_section_id)
-        except ValueError:
-            print(f"[WARNING] parent_section_id를 정수로 변환 실패: {parent_section_id}")
-            return [parent_section_id]
+#     Returns:
+#         list: 부모 섹션 ID와 모든 하위 섹션 ID 리스트
+#     """
+#     # 타입 통일 (정수로 변환)
+#     if isinstance(parent_section_id, str):
+#         try:
+#             parent_section_id = int(parent_section_id)
+#         except ValueError:
+#             print(f"[WARNING] parent_section_id를 정수로 변환 실패: {parent_section_id}")
+#             return [parent_section_id]
     
-    section_ids = [parent_section_id]
+#     section_ids = [parent_section_id]
     
-    # parent_id가 parent_section_id인 모든 하위 섹션 찾기
-    for section in all_sections:
-        section_parent_id = section.get("parent_id")
+#     # parent_id가 parent_section_id인 모든 하위 섹션 찾기
+#     for section in all_sections:
+#         section_parent_id = section.get("parent_id")
         
-        # parent_id가 None이면 최상위 섹션이므로 스킵
-        if section_parent_id is None:
-            continue
+#         # parent_id가 None이면 최상위 섹션이므로 스킵
+#         if section_parent_id is None:
+#             continue
         
-        # 타입 통일 (정수로 변환)
-        if isinstance(section_parent_id, str):
-            try:
-                section_parent_id = int(section_parent_id)
-            except ValueError:
-                continue
+#         # 타입 통일 (정수로 변환)
+#         if isinstance(section_parent_id, str):
+#             try:
+#                 section_parent_id = int(section_parent_id)
+#             except ValueError:
+#                 continue
         
-        # parent_id가 일치하는 경우
-        if section_parent_id == parent_section_id:
-            child_section_id = section["id"]
-            # 타입 통일
-            if isinstance(child_section_id, str):
-                try:
-                    child_section_id = int(child_section_id)
-                except ValueError:
-                    continue
+#         # parent_id가 일치하는 경우
+#         if section_parent_id == parent_section_id:
+#             child_section_id = section["id"]
+#             # 타입 통일
+#             if isinstance(child_section_id, str):
+#                 try:
+#                     child_section_id = int(child_section_id)
+#                 except ValueError:
+#                     continue
             
-            section_ids.append(child_section_id)
-            # 재귀적으로 하위 섹션의 하위 섹션도 찾기
-            section_ids.extend(get_all_subsection_ids(child_section_id, all_sections))
+#             section_ids.append(child_section_id)
+#             # 재귀적으로 하위 섹션의 하위 섹션도 찾기
+#             section_ids.extend(get_all_subsection_ids(child_section_id, all_sections))
     
-    return section_ids
+#     return section_ids
 
 
-@pytest.hookimpl(tryfirst=True)
-def pytest_sessionstart(session):
-    """
-    테스트 실행 시작 시:
-    1. section_id 기반으로 해당 섹션과 모든 하위 섹션의 케이스 ID 가져오기
-    2. 그 케이스들로 Run 생성
-    """
-    global testrail_run_id, case_id_map
+# @pytest.hookimpl(tryfirst=True)
+# def pytest_sessionstart(session):
+#     """
+#     테스트 실행 시작 시:
+#     1. section_id 기반으로 해당 섹션과 모든 하위 섹션의 케이스 ID 가져오기
+#     2. 그 케이스들로 Run 생성
+#     """
+#     global testrail_run_id, case_id_map
     
-    if testrail_run_id is not None:
-        print(f"[TestRail] 이미 Run(ID={testrail_run_id})이 존재합니다. 새 Run 생성 생략")
-        return
+#     if testrail_run_id is not None:
+#         print(f"[TestRail] 이미 Run(ID={testrail_run_id})이 존재합니다. 새 Run 생성 생략")
+#         return
     
-    if not TESTRAIL_SECTION_ID:
-        raise RuntimeError("[TestRail] TESTRAIL_SECTION_ID가 정의되지 않았습니다.")
+#     if not TESTRAIL_SECTION_ID:
+#         raise RuntimeError("[TestRail] TESTRAIL_SECTION_ID가 정의되지 않았습니다.")
     
-    # TESTRAIL_SECTION_ID를 정수로 변환
-    try:
-        section_id_int = int(TESTRAIL_SECTION_ID)
-    except (ValueError, TypeError):
-        raise RuntimeError(f"[TestRail] TESTRAIL_SECTION_ID '{TESTRAIL_SECTION_ID}'를 정수로 변환할 수 없습니다.")
+#     # TESTRAIL_SECTION_ID를 정수로 변환
+#     try:
+#         section_id_int = int(TESTRAIL_SECTION_ID)
+#     except (ValueError, TypeError):
+#         raise RuntimeError(f"[TestRail] TESTRAIL_SECTION_ID '{TESTRAIL_SECTION_ID}'를 정수로 변환할 수 없습니다.")
     
-    # 1. 모든 섹션 가져오기
-    print(f"[TestRail] 모든 섹션 가져오기 중...")
-    all_sections = testrail_get(
-        f"get_sections/{TESTRAIL_PROJECT_ID}&suite_id={TESTRAIL_SUITE_ID}"
-    )
+#     # 1. 모든 섹션 가져오기
+#     print(f"[TestRail] 모든 섹션 가져오기 중...")
+#     all_sections = testrail_get(
+#         f"get_sections/{TESTRAIL_PROJECT_ID}&suite_id={TESTRAIL_SUITE_ID}"
+#     )
     
-    # 디버깅: 섹션 구조 확인
-    print(f"[TestRail] 총 {len(all_sections)}개 섹션 발견")
-    print(f"[TestRail] 찾고자 하는 섹션 ID: {section_id_int} (타입: {type(section_id_int).__name__})")
+#     # 디버깅: 섹션 구조 확인
+#     print(f"[TestRail] 총 {len(all_sections)}개 섹션 발견")
+#     print(f"[TestRail] 찾고자 하는 섹션 ID: {section_id_int} (타입: {type(section_id_int).__name__})")
     
-    # 지정된 섹션이 존재하는지 확인
-    section_exists = any(s.get("id") == section_id_int for s in all_sections)
-    if not section_exists:
-        print(f"[WARNING] 섹션 ID {section_id_int}가 존재하지 않습니다.")
-        print(f"[DEBUG] 사용 가능한 섹션 ID 샘플 (최대 10개):")
-        for s in all_sections[:10]:
-            print(f"  - ID: {s.get('id')}, Name: {s.get('name')}, Parent ID: {s.get('parent_id')}")
+#     # 지정된 섹션이 존재하는지 확인
+#     section_exists = any(s.get("id") == section_id_int for s in all_sections)
+#     if not section_exists:
+#         print(f"[WARNING] 섹션 ID {section_id_int}가 존재하지 않습니다.")
+#         print(f"[DEBUG] 사용 가능한 섹션 ID 샘플 (최대 10개):")
+#         for s in all_sections[:10]:
+#             print(f"  - ID: {s.get('id')}, Name: {s.get('name')}, Parent ID: {s.get('parent_id')}")
     
-    # 2. 지정된 섹션과 모든 하위 섹션 ID 찾기
-    all_section_ids = get_all_subsection_ids(section_id_int, all_sections)
-    print(f"[TestRail] 섹션 ID {section_id_int}와 하위 섹션 {len(all_section_ids) - 1}개 발견: {all_section_ids}")
+#     # 2. 지정된 섹션과 모든 하위 섹션 ID 찾기
+#     all_section_ids = get_all_subsection_ids(section_id_int, all_sections)
+#     print(f"[TestRail] 섹션 ID {section_id_int}와 하위 섹션 {len(all_section_ids) - 1}개 발견: {all_section_ids}")
     
-    # 3. 각 섹션의 케이스 가져오기
-    all_case_ids = []
-    for section_id in all_section_ids:
-        try:
-            cases = testrail_get(
-                f"get_cases/{TESTRAIL_PROJECT_ID}&suite_id={TESTRAIL_SUITE_ID}&section_id={section_id}"
-            )
-            section_case_ids = [c["id"] for c in cases]
-            all_case_ids.extend(section_case_ids)
-            case_id_map[section_id] = section_case_ids
-            if section_case_ids:
-                print(f"[TestRail] 섹션 {section_id}: {len(section_case_ids)}개 케이스 발견")
-        except Exception as e:
-            print(f"[WARNING] 섹션 {section_id}의 케이스 가져오기 실패: {e}")
+#     # 3. 각 섹션의 케이스 가져오기
+#     all_case_ids = []
+#     for section_id in all_section_ids:
+#         try:
+#             cases = testrail_get(
+#                 f"get_cases/{TESTRAIL_PROJECT_ID}&suite_id={TESTRAIL_SUITE_ID}&section_id={section_id}"
+#             )
+#             section_case_ids = [c["id"] for c in cases]
+#             all_case_ids.extend(section_case_ids)
+#             case_id_map[section_id] = section_case_ids
+#             if section_case_ids:
+#                 print(f"[TestRail] 섹션 {section_id}: {len(section_case_ids)}개 케이스 발견")
+#         except Exception as e:
+#             print(f"[WARNING] 섹션 {section_id}의 케이스 가져오기 실패: {e}")
     
-    # 중복 제거 (같은 케이스가 여러 섹션에 있을 수 있음)
-    all_case_ids = list(set(all_case_ids))
+#     # 중복 제거 (같은 케이스가 여러 섹션에 있을 수 있음)
+#     all_case_ids = list(set(all_case_ids))
     
-    if not all_case_ids:
-        raise RuntimeError(f"[TestRail] section_id '{section_id_int}'와 하위 섹션에 케이스가 없습니다.")
+#     if not all_case_ids:
+#         raise RuntimeError(f"[TestRail] section_id '{section_id_int}'와 하위 섹션에 케이스가 없습니다.")
     
-    print(f"[TestRail] 총 {len(all_case_ids)}개 케이스 수집 완료")
+#     print(f"[TestRail] 총 {len(all_case_ids)}개 케이스 수집 완료")
     
-    # 4. Run 생성
-    run_name = f"Gmarket Regression test dweb {datetime.now():%Y-%m-%d %H:%M:%S}"
-    payload = {
-        "suite_id": TESTRAIL_SUITE_ID,
-        "name": run_name,
-        "include_all": False,
-        "case_ids": all_case_ids,
-        "milestone_id": TESTRAIL_MILESTONE_ID
-    }
-    run = testrail_post(f"add_run/{TESTRAIL_PROJECT_ID}", payload)
-    testrail_run_id = run["id"]
-    print(f"[TestRail] section_id '{section_id_int}' (하위 섹션 포함) Run 생성 완료 (ID={testrail_run_id})")
+#     # 4. Run 생성
+#     run_name = f"Gmarket Regression test dweb {datetime.now():%Y-%m-%d %H:%M:%S}"
+#     payload = {
+#         "suite_id": TESTRAIL_SUITE_ID,
+#         "name": run_name,
+#         "include_all": False,
+#         "case_ids": all_case_ids,
+#         "milestone_id": TESTRAIL_MILESTONE_ID
+#     }
+#     run = testrail_post(f"add_run/{TESTRAIL_PROJECT_ID}", payload)
+#     testrail_run_id = run["id"]
+#     print(f"[TestRail] section_id '{section_id_int}' (하위 섹션 포함) Run 생성 완료 (ID={testrail_run_id})")
 
 
-# 커스텀 로그 핸들러 - 테스트 실행 중 로그를 수집
-class TestLogHandler(logging.Handler):
-    """테스트 실행 중 로그를 수집하는 커스텀 핸들러"""
-    def __init__(self):
-        super().__init__()
-        self.logs = []
+# # 커스텀 로그 핸들러 - 테스트 실행 중 로그를 수집
+# class TestLogHandler(logging.Handler):
+#     """테스트 실행 중 로그를 수집하는 커스텀 핸들러"""
+#     def __init__(self):
+#         super().__init__()
+#         self.logs = []
     
-    def emit(self, record):
-        """로그 레코드를 수집"""
-        if record.levelno >= logging.INFO:  # INFO 이상만 수집
-            log_message = self.format(record)
-            self.logs.append(log_message)
+#     def emit(self, record):
+#         """로그 레코드를 수집"""
+#         if record.levelno >= logging.INFO:  # INFO 이상만 수집
+#             log_message = self.format(record)
+#             self.logs.append(log_message)
     
-    def clear(self):
-        """로그 초기화"""
-        self.logs = []
+#     def clear(self):
+#         """로그 초기화"""
+#         self.logs = []
     
-    def get_logs(self):
-        """수집된 로그 반환"""
-        return "\n".join(self.logs)
+#     def get_logs(self):
+#         """수집된 로그 반환"""
+#         return "\n".join(self.logs)
 
-# 전역 로그 핸들러
-test_log_handler = TestLogHandler()
-test_log_handler.setLevel(logging.INFO)
-test_log_handler.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
+# # 전역 로그 핸들러
+# test_log_handler = TestLogHandler()
+# test_log_handler.setLevel(logging.INFO)
+# test_log_handler.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
 
-# 루트 로거에 핸들러 추가
-root_logger = logging.getLogger()
-root_logger.addHandler(test_log_handler)
+# # 루트 로거에 핸들러 추가
+# root_logger = logging.getLogger()
+# root_logger.addHandler(test_log_handler)
 
 
-@pytest.hookimpl(hookwrapper=True)
-def pytest_runtest_setup(item):
-    """테스트 시작 시 로그 핸들러 초기화"""
-    global current_test_nodeid
-    current_test_nodeid = item.nodeid
-    test_log_handler.clear()
+# @pytest.hookimpl(hookwrapper=True)
+# def pytest_runtest_setup(item):
+#     """테스트 시작 시 로그 핸들러 초기화"""
+#     global current_test_nodeid
+#     current_test_nodeid = item.nodeid
+#     test_log_handler.clear()
     
-    outcome = yield
+#     outcome = yield
 
 
-@pytest.hookimpl(hookwrapper=True)
-def pytest_runtest_teardown(item, nextitem):
-    """테스트 종료 시 로그 핸들러 초기화 (다음 테스트와 로그 섞임 방지)"""
-    outcome = yield
-    # teardown 후에 초기화 (pytest_runtest_logreport와 pytest_runtest_makereport가 모두 실행된 후)
-    # 다음 테스트가 있는 경우에만 초기화 (마지막 테스트는 세션 종료 시 정리)
-    if nextitem:
-        test_log_handler.clear()
+# @pytest.hookimpl(hookwrapper=True)
+# def pytest_runtest_teardown(item, nextitem):
+#     """테스트 종료 시 로그 핸들러 초기화 (다음 테스트와 로그 섞임 방지)"""
+#     outcome = yield
+#     # teardown 후에 초기화 (pytest_runtest_logreport와 pytest_runtest_makereport가 모두 실행된 후)
+#     # 다음 테스트가 있는 경우에만 초기화 (마지막 테스트는 세션 종료 시 정리)
+#     if nextitem:
+#         test_log_handler.clear()
 
 
-@pytest.hookimpl(hookwrapper=True, tryfirst=True)
-def pytest_runtest_logreport(report):
-    """
-    각 테스트의 로그를 수집하여 test_logs에 저장
-    pytest_runtest_makereport보다 먼저 실행되도록 tryfirst=True 설정
-    """
-    outcome = yield
-    # setup, call, teardown 모든 단계에서 로그 수집
-    if report.when == "call":  # 실행 단계만
-        nodeid = report.nodeid
-        if report.outcome in ("passed", "failed", "skipped"):
-            # 수집된 로그 가져오기 (이 시점에 현재 테스트의 로그만 있어야 함)
-            # pytest_runtest_setup과 pytest_bdd_before_scenario에서 이미 초기화했으므로
-            # 현재 테스트의 로그만 있어야 함
-            logs = test_log_handler.get_logs()
-            if logs and logs.strip():
-                # nodeid를 키로 사용하여 저장 (성공/실패 모두 저장)
-                test_logs[nodeid] = logs
-                # 로그 라인 수 확인
-                log_lines = logs.split(chr(10))
-                print(f"[DEBUG] 테스트 {nodeid} 로그 수집 완료: {len(log_lines)}줄 (outcome: {report.outcome})")
-                # 로그를 test_logs에 저장했으므로 즉시 초기화 (다음 테스트와 로그 섞임 방지)
-                # pytest_runtest_makereport에서 사용할 때까지는 test_logs에 보관됨
-                test_log_handler.clear()
-            else:
-                print(f"[DEBUG] 테스트 {nodeid} 로그 없음 (빈 로그 또는 수집 실패, outcome: {report.outcome})")
-                # 로그가 없어도 초기화 (이전 로그 제거)
-                test_log_handler.clear()
+# @pytest.hookimpl(hookwrapper=True, tryfirst=True)
+# def pytest_runtest_logreport(report):
+#     """
+#     각 테스트의 로그를 수집하여 test_logs에 저장
+#     pytest_runtest_makereport보다 먼저 실행되도록 tryfirst=True 설정
+#     """
+#     outcome = yield
+#     # setup, call, teardown 모든 단계에서 로그 수집
+#     if report.when == "call":  # 실행 단계만
+#         nodeid = report.nodeid
+#         if report.outcome in ("passed", "failed", "skipped"):
+#             # 수집된 로그 가져오기 (이 시점에 현재 테스트의 로그만 있어야 함)
+#             # pytest_runtest_setup과 pytest_bdd_before_scenario에서 이미 초기화했으므로
+#             # 현재 테스트의 로그만 있어야 함
+#             logs = test_log_handler.get_logs()
+#             if logs and logs.strip():
+#                 # nodeid를 키로 사용하여 저장 (성공/실패 모두 저장)
+#                 test_logs[nodeid] = logs
+#                 # 로그 라인 수 확인
+#                 log_lines = logs.split(chr(10))
+#                 print(f"[DEBUG] 테스트 {nodeid} 로그 수집 완료: {len(log_lines)}줄 (outcome: {report.outcome})")
+#                 # 로그를 test_logs에 저장했으므로 즉시 초기화 (다음 테스트와 로그 섞임 방지)
+#                 # pytest_runtest_makereport에서 사용할 때까지는 test_logs에 보관됨
+#                 test_log_handler.clear()
+#             else:
+#                 print(f"[DEBUG] 테스트 {nodeid} 로그 없음 (빈 로그 또는 수집 실패, outcome: {report.outcome})")
+#                 # 로그가 없어도 초기화 (이전 로그 제거)
+#                 test_log_handler.clear()
 
 
-@pytest.hookimpl(hookwrapper=True)
-def pytest_runtest_makereport(item, call):
-    """
-    각 테스트 결과를 TestRail에 기록 + 실패 시 스크린샷 첨부
-    INTERNALERROR 방지를 위해 모든 외부 호출은 try/except로 보호
-    BDD 시나리오와 일반 pytest 테스트 모두 지원
-    """
-    outcome = yield
-    result = outcome.get_result()
+# @pytest.hookimpl(hookwrapper=True)
+# def pytest_runtest_makereport(item, call):
+#     """
+#     각 테스트 결과를 TestRail에 기록 + 실패 시 스크린샷 첨부
+#     INTERNALERROR 방지를 위해 모든 외부 호출은 try/except로 보호
+#     BDD 시나리오와 일반 pytest 테스트 모두 지원
+#     """
+#     outcome = yield
+#     result = outcome.get_result()
 
-    try:
-        # BDD 시나리오의 경우 태그에서 case_id 추출
-        case_id = None
+#     try:
+#         # BDD 시나리오의 경우 태그에서 case_id 추출
+#         case_id = None
 
-        # 1. funcargs에서 case_id 파라미터 확인 (가장 우선순위)
-        # Scenario Outline의 Examples 테이블에서 case_id 컬럼이 있으면 우선 사용
-        if "case_id" in item.funcargs:
-            case_id = item.funcargs.get("case_id")
-            if case_id:
-                print(f"[TestRail] Examples 테이블에서 case_id 추출: {case_id}")
+#         # 1. funcargs에서 case_id 파라미터 확인 (가장 우선순위)
+#         # Scenario Outline의 Examples 테이블에서 case_id 컬럼이 있으면 우선 사용
+#         if "case_id" in item.funcargs:
+#             case_id = item.funcargs.get("case_id")
+#             if case_id:
+#                 print(f"[TestRail] Examples 테이블에서 case_id 추출: {case_id}")
 
-        # 2. BDD 시나리오의 태그에서 직접 추출 (pytest-bdd)
-        # pytest-bdd는 feature 파일의 태그(@C12345)를 pytest 마커로 변환
-        if case_id is None:
-            # item.iter_markers()를 사용하여 모든 마커 확인
-            for marker in item.iter_markers():
-                marker_name = marker.name
-                # @C12345 형식의 태그 찾기 (C로 시작하고 뒤에 숫자만 있는 경우)
-                if marker_name.startswith("C") and len(marker_name) > 1 and marker_name[1:].isdigit():
-                    case_id = marker_name
-                    print(f"[TestRail] 태그에서 case_id 추출: {case_id}")
-                    break
+#         # 2. BDD 시나리오의 태그에서 직접 추출 (pytest-bdd)
+#         # pytest-bdd는 feature 파일의 태그(@C12345)를 pytest 마커로 변환
+#         if case_id is None:
+#             # item.iter_markers()를 사용하여 모든 마커 확인
+#             for marker in item.iter_markers():
+#                 marker_name = marker.name
+#                 # @C12345 형식의 태그 찾기 (C로 시작하고 뒤에 숫자만 있는 경우)
+#                 if marker_name.startswith("C") and len(marker_name) > 1 and marker_name[1:].isdigit():
+#                     case_id = marker_name
+#                     print(f"[TestRail] 태그에서 case_id 추출: {case_id}")
+#                     break
 
-        # 3. item.nodeid에서도 확인 (백업 방법)
-        # pytest-bdd는 때때로 nodeid에 태그를 포함시킬 수 있음
-        if case_id is None:
-            nodeid = item.nodeid
-            # nodeid에서 [C12345] 형식 찾기
-            match = re.search(r'\[C(\d+)\]', nodeid)
-            if match:
-                case_id = f"C{match.group(1)}"
-                print(f"[TestRail] nodeid에서 case_id 추출: {case_id}")
+#         # 3. item.nodeid에서도 확인 (백업 방법)
+#         # pytest-bdd는 때때로 nodeid에 태그를 포함시킬 수 있음
+#         if case_id is None:
+#             nodeid = item.nodeid
+#             # nodeid에서 [C12345] 형식 찾기
+#             match = re.search(r'\[C(\d+)\]', nodeid)
+#             if match:
+#                 case_id = f"C{match.group(1)}"
+#                 print(f"[TestRail] nodeid에서 case_id 추출: {case_id}")
 
-        # case_id를 찾지 못했거나 testrail_run_id가 없으면 기록하지 않음
-        if case_id is None:
-            print(f"[TestRail] case_id를 찾을 수 없음. nodeid: {item.nodeid}")
-            return
+#         # case_id를 찾지 못했거나 testrail_run_id가 없으면 기록하지 않음
+#         if case_id is None:
+#             print(f"[TestRail] case_id를 찾을 수 없음. nodeid: {item.nodeid}")
+#             return
 
-        if testrail_run_id is None:
-            print("[TestRail] testrail_run_id가 없습니다. 기록 생략")
-            return
+#         if testrail_run_id is None:
+#             print("[TestRail] testrail_run_id가 없습니다. 기록 생략")
+#             return
 
-        # Cxxxx → 숫자만 추출
-        if isinstance(case_id, str) and case_id.startswith("C"):
-            case_id = case_id[1:]
-        case_id = int(case_id)  # API는 int만 허용
+#         # Cxxxx → 숫자만 추출
+#         if isinstance(case_id, str) and case_id.startswith("C"):
+#             case_id = case_id[1:]
+#         case_id = int(case_id)  # API는 int만 허용
 
-        screenshot_path = None
-        if result.when == "call":  # 실행 단계만 기록
-            if result.failed:
-                status_id = 5  # Failed
-                comment = f"테스트 실패: {result.longrepr}"
+#         screenshot_path = None
+#         if result.when == "call":  # 실행 단계만 기록
+#             if result.failed:
+#                 status_id = 5  # Failed
+#                 comment = f"테스트 실패: {result.longrepr}"
 
-                # 스크린샷 시도
-                try:
-                    page = None
+#                 # 스크린샷 시도
+#                 try:
+#                     page = None
                     
-                    # PlaywrightSharedState에서 직접 가져오기 (가장 간단하고 안정적)
-                    if PlaywrightSharedState.feature_browser_session:
-                        if hasattr(PlaywrightSharedState.feature_browser_session, 'page'):
-                            page = PlaywrightSharedState.feature_browser_session.page
-                            print(f"[DEBUG] PlaywrightSharedState에서 page 가져옴")
+#                     # PlaywrightSharedState에서 직접 가져오기 (가장 간단하고 안정적)
+#                     if PlaywrightSharedState.feature_browser_session:
+#                         if hasattr(PlaywrightSharedState.feature_browser_session, 'page'):
+#                             page = PlaywrightSharedState.feature_browser_session.page
+#                             print(f"[DEBUG] PlaywrightSharedState에서 page 가져옴")
                     
-                    # 백업: item.funcargs에서 직접 가져오기 시도
-                    if not page and hasattr(item, 'funcargs') and item.funcargs:
-                        if "browser_session" in item.funcargs:
-                            browser_session = item.funcargs.get("browser_session")
-                            if browser_session and hasattr(browser_session, 'page'):
-                                page = browser_session.page
-                                print(f"[DEBUG] funcargs에서 browser_session.page 가져옴")
-                        if not page and "page" in item.funcargs:
-                            page = item.funcargs.get("page")
-                            print(f"[DEBUG] funcargs에서 page 가져옴")
+#                     # 백업: item.funcargs에서 직접 가져오기 시도
+#                     if not page and hasattr(item, 'funcargs') and item.funcargs:
+#                         if "browser_session" in item.funcargs:
+#                             browser_session = item.funcargs.get("browser_session")
+#                             if browser_session and hasattr(browser_session, 'page'):
+#                                 page = browser_session.page
+#                                 print(f"[DEBUG] funcargs에서 browser_session.page 가져옴")
+#                         if not page and "page" in item.funcargs:
+#                             page = item.funcargs.get("page")
+#                             print(f"[DEBUG] funcargs에서 page 가져옴")
                     
-                    # 백업: item._request를 통해 fixture 가져오기 시도
-                    if not page and hasattr(item, '_request'):
-                        try:
-                            if "browser_session" in item._request.fixturenames:
-                                browser_session = item._request.getfixturevalue("browser_session")
-                                if browser_session and hasattr(browser_session, 'page'):
-                                    page = browser_session.page
-                                    print(f"[DEBUG] _request에서 browser_session.page 가져옴")
-                        except Exception as e:
-                            print(f"[DEBUG] browser_session fixture 가져오기 실패: {e}")
+#                     # 백업: item._request를 통해 fixture 가져오기 시도
+#                     if not page and hasattr(item, '_request'):
+#                         try:
+#                             if "browser_session" in item._request.fixturenames:
+#                                 browser_session = item._request.getfixturevalue("browser_session")
+#                                 if browser_session and hasattr(browser_session, 'page'):
+#                                     page = browser_session.page
+#                                     print(f"[DEBUG] _request에서 browser_session.page 가져옴")
+#                         except Exception as e:
+#                             print(f"[DEBUG] browser_session fixture 가져오기 실패: {e}")
                         
-                        if not page:
-                            try:
-                                if "page" in item._request.fixturenames:
-                                    page = item._request.getfixturevalue("page")
-                                    print(f"[DEBUG] _request에서 page 가져옴")
-                            except Exception as e:
-                                print(f"[DEBUG] page fixture 가져오기 실패: {e}")
+#                         if not page:
+#                             try:
+#                                 if "page" in item._request.fixturenames:
+#                                     page = item._request.getfixturevalue("page")
+#                                     print(f"[DEBUG] _request에서 page 가져옴")
+#                             except Exception as e:
+#                                 print(f"[DEBUG] page fixture 가져오기 실패: {e}")
                     
-                    if page and not page.is_closed():
-                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                        screenshot_path = f"screenshots/{case_id}_{timestamp}.png"
-                        os.makedirs(os.path.dirname(screenshot_path), exist_ok=True)
-                        page.screenshot(path=screenshot_path, timeout=2000)
-                        print(f"[TestRail] 스크린샷 저장 완료: {screenshot_path}")
-                    else:
-                        print(f"[WARNING] 스크린샷 실패: page 객체를 찾을 수 없음")
-                        print(f"[DEBUG] PlaywrightSharedState.feature_browser_session: {PlaywrightSharedState.feature_browser_session is not None}")
-                        print(f"[DEBUG] funcargs 키: {list(item.funcargs.keys()) if hasattr(item, 'funcargs') and item.funcargs else 'N/A'}")
-                        print(f"[DEBUG] fixturenames: {list(item._request.fixturenames) if hasattr(item, '_request') else 'N/A'}")
-                except Exception as e:
-                    print(f"[WARNING] 스크린샷 실패: {e}")
-                    import traceback
-                    print(f"[DEBUG] 스크린샷 실패 상세: {traceback.format_exc()}")
+#                     if page and not page.is_closed():
+#                         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+#                         screenshot_path = f"screenshots/{case_id}_{timestamp}.png"
+#                         os.makedirs(os.path.dirname(screenshot_path), exist_ok=True)
+#                         page.screenshot(path=screenshot_path, timeout=2000)
+#                         print(f"[TestRail] 스크린샷 저장 완료: {screenshot_path}")
+#                     else:
+#                         print(f"[WARNING] 스크린샷 실패: page 객체를 찾을 수 없음")
+#                         print(f"[DEBUG] PlaywrightSharedState.feature_browser_session: {PlaywrightSharedState.feature_browser_session is not None}")
+#                         print(f"[DEBUG] funcargs 키: {list(item.funcargs.keys()) if hasattr(item, 'funcargs') and item.funcargs else 'N/A'}")
+#                         print(f"[DEBUG] fixturenames: {list(item._request.fixturenames) if hasattr(item, '_request') else 'N/A'}")
+#                 except Exception as e:
+#                     print(f"[WARNING] 스크린샷 실패: {e}")
+#                     import traceback
+#                     print(f"[DEBUG] 스크린샷 실패 상세: {traceback.format_exc()}")
 
-            elif result.skipped:
-                status_id = 2  # Blocked
-                comment = "테스트 스킵"
-            else:
-                status_id = 1  # Passed
-                comment = "테스트 성공"
+#             elif result.skipped:
+#                 status_id = 2  # Blocked
+#                 comment = "테스트 스킵"
+#             else:
+#                 status_id = 1  # Passed
+#                 comment = "테스트 성공"
 
-            # 실행 시간 기록
-            duration_sec = getattr(result, "duration", 0)
-            if duration_sec and duration_sec > 0.1:
-                elapsed = f"{duration_sec:.1f}s"
-            else:
-                elapsed = None
+#             # 실행 시간 기록
+#             duration_sec = getattr(result, "duration", 0)
+#             if duration_sec and duration_sec > 0.1:
+#                 elapsed = f"{duration_sec:.1f}s"
+#             else:
+#                 elapsed = None
 
-            # 수집된 로그 추가
-            # pytest_runtest_logreport에서 수집한 로그 또는 직접 핸들러에서 가져오기
-            # pass/fail/skip 모든 경우에 로그 포함
-            log_content = None
+#             # 수집된 로그 추가
+#             # pytest_runtest_logreport에서 수집한 로그 또는 직접 핸들러에서 가져오기
+#             # pass/fail/skip 모든 경우에 로그 포함
+#             log_content = None
             
-            # 1. test_logs에서 먼저 확인 (pytest_runtest_logreport에서 수집된 경우)
-            log_content = None
-            if item.nodeid in test_logs:
-                log_content = test_logs[item.nodeid]
-                # 사용 후 삭제 (메모리 절약)
-                del test_logs[item.nodeid]
-                print(f"[DEBUG] 테스트 {item.nodeid} 로그를 test_logs에서 가져옴 (status: {status_id})")
-            else:
-                # 2. nodeid 부분 매칭 시도 (pytest-bdd는 nodeid 형식이 다를 수 있음)
-                # 정확한 매칭을 위해 여러 형식 시도
-                matched = False
-                for stored_nodeid, stored_logs in list(test_logs.items()):
-                    # 정확히 일치하거나, 한쪽이 다른 쪽을 포함하는 경우
-                    if (item.nodeid == stored_nodeid or 
-                        item.nodeid in stored_nodeid or 
-                        stored_nodeid in item.nodeid):
-                        log_content = stored_logs
-                        # 매칭된 항목도 삭제
-                        del test_logs[stored_nodeid]
-                        matched = True
-                        print(f"[DEBUG] 테스트 {item.nodeid} 로그를 매칭된 nodeid {stored_nodeid}에서 가져옴 (status: {status_id})")
-                        break
+#             # 1. test_logs에서 먼저 확인 (pytest_runtest_logreport에서 수집된 경우)
+#             log_content = None
+#             if item.nodeid in test_logs:
+#                 log_content = test_logs[item.nodeid]
+#                 # 사용 후 삭제 (메모리 절약)
+#                 del test_logs[item.nodeid]
+#                 print(f"[DEBUG] 테스트 {item.nodeid} 로그를 test_logs에서 가져옴 (status: {status_id})")
+#             else:
+#                 # 2. nodeid 부분 매칭 시도 (pytest-bdd는 nodeid 형식이 다를 수 있음)
+#                 # 정확한 매칭을 위해 여러 형식 시도
+#                 matched = False
+#                 for stored_nodeid, stored_logs in list(test_logs.items()):
+#                     # 정확히 일치하거나, 한쪽이 다른 쪽을 포함하는 경우
+#                     if (item.nodeid == stored_nodeid or 
+#                         item.nodeid in stored_nodeid or 
+#                         stored_nodeid in item.nodeid):
+#                         log_content = stored_logs
+#                         # 매칭된 항목도 삭제
+#                         del test_logs[stored_nodeid]
+#                         matched = True
+#                         print(f"[DEBUG] 테스트 {item.nodeid} 로그를 매칭된 nodeid {stored_nodeid}에서 가져옴 (status: {status_id})")
+#                         break
                 
-                # 3. 매칭 실패 시 백업으로 핸들러에서 직접 가져오기 시도
-                # (pytest_runtest_logreport가 실행되지 않았을 수 있음)
-                if not matched:
-                    logs = test_log_handler.get_logs()
-                    if logs and logs.strip():
-                        log_content = logs
-                        print(f"[DEBUG] 테스트 {item.nodeid} 로그를 핸들러에서 직접 가져옴 (백업, status: {status_id})")
-                        # 사용 후 초기화
-                        test_log_handler.clear()
-                    else:
-                        print(f"[DEBUG] 테스트 {item.nodeid}의 로그를 찾을 수 없음. test_logs 키: {list(test_logs.keys())}, status: {status_id}")
+#                 # 3. 매칭 실패 시 백업으로 핸들러에서 직접 가져오기 시도
+#                 # (pytest_runtest_logreport가 실행되지 않았을 수 있음)
+#                 if not matched:
+#                     logs = test_log_handler.get_logs()
+#                     if logs and logs.strip():
+#                         log_content = logs
+#                         print(f"[DEBUG] 테스트 {item.nodeid} 로그를 핸들러에서 직접 가져옴 (백업, status: {status_id})")
+#                         # 사용 후 초기화
+#                         test_log_handler.clear()
+#                     else:
+#                         print(f"[DEBUG] 테스트 {item.nodeid}의 로그를 찾을 수 없음. test_logs 키: {list(test_logs.keys())}, status: {status_id}")
             
-            # 성공/실패/스킵 모두에 대해 로그 추가
-            if log_content and log_content.strip():
-                comment += f"\n\n--- 실행 로그 ---\n{log_content}"
-                print(f"[DEBUG] 테스트 {item.nodeid} 로그 추가 완료 (status: {status_id}, 로그 {len(log_content.split(chr(10)))}줄)")
-            else:
-                # 로그가 없는 경우에도 디버깅 정보 출력
-                print(f"[DEBUG] 테스트 {item.nodeid}의 로그가 없음 (status: {status_id})")
+#             # 성공/실패/스킵 모두에 대해 로그 추가
+#             if log_content and log_content.strip():
+#                 comment += f"\n\n--- 실행 로그 ---\n{log_content}"
+#                 print(f"[DEBUG] 테스트 {item.nodeid} 로그 추가 완료 (status: {status_id}, 로그 {len(log_content.split(chr(10)))}줄)")
+#             else:
+#                 # 로그가 없는 경우에도 디버깅 정보 출력
+#                 print(f"[DEBUG] 테스트 {item.nodeid}의 로그가 없음 (status: {status_id})")
 
-            # TestRail 기록
-            payload = {
-                "status_id": status_id,
-                "comment": comment,
-            }
-            if elapsed:
-                payload["elapsed"] = elapsed
+#             # TestRail 기록
+#             payload = {
+#                 "status_id": status_id,
+#                 "comment": comment,
+#             }
+#             if elapsed:
+#                 payload["elapsed"] = elapsed
 
-            result_id = None
-            try:
-                result_obj = testrail_post(
-                    f"add_result_for_case/{testrail_run_id}/{case_id}", payload
-                )
-                result_id = result_obj.get("id")
-            except Exception as e:
-                print(f"[WARNING] TestRail 기록 실패: {e}")
+#             result_id = None
+#             try:
+#                 result_obj = testrail_post(
+#                     f"add_result_for_case/{testrail_run_id}/{case_id}", payload
+#                 )
+#                 result_id = result_obj.get("id")
+#             except Exception as e:
+#                 print(f"[WARNING] TestRail 기록 실패: {e}")
 
-            # 스크린샷 첨부
-            if screenshot_path and result_id:
-                try:
-                    with open(screenshot_path, "rb") as f:
-                        testrail_post(
-                            f"add_attachment_to_result/{result_id}",
-                            files={"attachment": f},
-                        )
-                except Exception as e:
-                    print(f"[WARNING] TestRail 스크린샷 업로드 실패: {e}")
+#             # 스크린샷 첨부
+#             if screenshot_path and result_id:
+#                 try:
+#                     with open(screenshot_path, "rb") as f:
+#                         testrail_post(
+#                             f"add_attachment_to_result/{result_id}",
+#                             files={"attachment": f},
+#                         )
+#                 except Exception as e:
+#                     print(f"[WARNING] TestRail 스크린샷 업로드 실패: {e}")
 
-            print(f"[TestRail] case_id {case_id} 결과 기록 완료 (status_id: {status_id})")
+#             print(f"[TestRail] case_id {case_id} 결과 기록 완료 (status_id: {status_id})")
 
-    except Exception as e:
-        # 어떤 이유로든 pytest 자체 중단 방지
-        print(f"[ERROR] pytest_runtest_makereport 처리 중 예외 발생 (무시됨): {e}")
+#     except Exception as e:
+#         # 어떤 이유로든 pytest 자체 중단 방지
+#         print(f"[ERROR] pytest_runtest_makereport 처리 중 예외 발생 (무시됨): {e}")
 
-@pytest.hookimpl(trylast=True)
-def pytest_sessionfinish(session, exitstatus):
-    """
-    전체 테스트 종료 후 Run 닫기
-    """
-    global testrail_run_id
-    if testrail_run_id:
-        testrail_post(f"close_run/{testrail_run_id}", {})
-        print(f"[TestRail] Run {testrail_run_id} 종료 완료")
+# @pytest.hookimpl(trylast=True)
+# def pytest_sessionfinish(session, exitstatus):
+#     """
+#     전체 테스트 종료 후 Run 닫기
+#     """
+#     global testrail_run_id
+#     if testrail_run_id:
+#         testrail_post(f"close_run/{testrail_run_id}", {})
+#         print(f"[TestRail] Run {testrail_run_id} 종료 완료")
 
-    screenshots_dir = "screenshots"
-    if os.path.exists(screenshots_dir):
-        shutil.rmtree(screenshots_dir)  # 폴더 통째로 삭제
-        print(f"[CLEANUP] '{screenshots_dir}' 폴더 삭제 완료")
+#     screenshots_dir = "screenshots"
+#     if os.path.exists(screenshots_dir):
+#         shutil.rmtree(screenshots_dir)  # 폴더 통째로 삭제
+#         print(f"[CLEANUP] '{screenshots_dir}' 폴더 삭제 완료")

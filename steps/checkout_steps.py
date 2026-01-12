@@ -9,6 +9,7 @@ from pages.checkout_page import CheckoutPage
 from pages.search_page import SearchPage
 from pages.home_page import HomePage
 import logging
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -182,8 +183,8 @@ def user_selects_payment_method(browser_session):
     logger.info("결제 방법 선택")
 
 
-@when(parsers.parse('사용자가 "{payment_method}"의 "{pament_type}" 을 선택한다'))
-def user_pays_with_method(browser_session, payment_method, pament_type):
+@when(parsers.parse('사용자가 "{payment_method}"의 "{payment_type}" 을 선택한다'))
+def user_pays_with_method(browser_session, payment_method, payment_type):
     """
     사용자가 특정 결제 방법으로 결제
     
@@ -203,7 +204,7 @@ def user_pays_with_method(browser_session, payment_method, pament_type):
         # 먼저 일반결제 선택
         checkout_page.select_payment_method("일반 결제")
         # 그 다음 하위 결제 방법 선택
-        checkout_page.select_normal_payment_method(payment_method)
+        checkout_page.select_normal_payment_method(payment_type)
 
     
     logger.info(f"결제 방법 선택: {payment_method}")
@@ -335,4 +336,75 @@ def order_is_created_with_pending_payment(browser_session):
     
     actual_page.wait_for_load_state("networkidle")
     # TODO: 주문 완료 페이지에서 입금 대기 상태 확인 로직 구현
+    checkout_page = CheckoutPage(browser_session.page)
+    
+    # actual_page.on("dialog",checkout_page.handle_dialog)
+
     logger.info("입금 대기 상태 주문 생성 확인")
+
+
+@when("사용자가 비회원 주문정보를 입력한다")
+def user_fill_nonmember_info(browser_session):
+    """
+    사용자가 비회원 주문정보 입력
+    
+    Args:
+        browser_session: BrowserSession 객체 (page 참조 관리)
+    """
+
+    checkout_page = CheckoutPage(browser_session.page)
+    browser_session.page.wait_for_load_state("networkidle")
+
+    #주문 정보 입력
+    checkout_page.fill_nonmember_info("김찬휘","01094294226","cksgnl777@naver.com","gksksla12")
+    
+    #주문자 정보 동일 체크
+    checkout_page.check_equalName()
+
+    logger.info("주문정보 입력 완료")
+
+@then("비회원 주문정보가 정상적으로 입력 되었다")
+def check_nonmember_info(broser_session):
+    # TODO 비회원 주문정보 정상 입력 확인 로직 구현
+    logger.info("비회원 주문정로 정상입력 확인")
+
+@when(parsers.parse('사용자가 주소 "{address}"와 상세주소 "{address2}"를 입력한다'))
+def user_fill_address_info(browser_session, address, address2):
+    """
+    사용자가 주소 입력
+
+    Args:
+        browser_session: BrowserSession 객체 (page 참조 관리)    
+    """
+    checkout_page = CheckoutPage(browser_session.page)
+    browser_session.page.wait_for_load_state("networkidle")
+    checkout_page.click_find_address()
+    checkout_page.fill_address(address)
+    checkout_page.fill_address2(address2)
+    logger.info("주소 입력 완료")
+
+@then("주소가 정상적으로 입력 되었다")
+def check_nonmember_info(broser_session):
+    # TODO 주소 정상 입력 확인 로직 구현
+    logger.info("주소 정상입력 확인")
+
+@when(parsers.parse('사용자가 비회원으로 "{bank_name}" 무통장입금 주문을 생성한다'))
+def user_fill_bank_account(browser_session, bank_name):
+    
+    checkout_page = CheckoutPage(browser_session.page)
+    browser_session.page.wait_for_load_state("networkidle")
+
+    # 은행 종류 선택
+    checkout_page.select_bank_type(bank_name)
+
+    # 계좌 정보 입력
+    checkout_page.fill_bank_account("01094294226","김찬휘")
+    
+    # 서비스 약관 전체 동의
+    checkout_page.check_agreInfoAll()
+    
+    # 주문 완료
+    checkout_page.click_order_button()
+    logger.info("계좌정보 입력 완료")
+
+    

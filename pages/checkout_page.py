@@ -105,7 +105,7 @@ class CheckoutPage(BasePage):
         logger.debug(f"은행 종류 선택: {bank_type}")
         
         # 요소 찾기
-        element = self.get_by_text(bank_type)
+        element = self.get_by_role("button",name = bank_type)
         
         # 요소가 나타날 때까지 대기
         element.wait_for(state="attached", timeout=timeout)
@@ -134,7 +134,9 @@ class CheckoutPage(BasePage):
         logger.debug("결제하기 버튼 클릭")
         
         # 요소 찾기
-        element = self.get_by_text("결제하기")
+
+        element = self.get_by_role("button",name = "결제하기")
+        # element = self.get_by_text("결제하기")
         
         # 요소가 나타날 때까지 대기
         element.wait_for(state="attached", timeout=timeout)
@@ -305,4 +307,134 @@ class CheckoutPage(BasePage):
                 raise
         
         logger.info("스마일페이 비밀번호 입력 완료")
+
+    def fill_nonmember_info(self, buyername: str, phonenumber: str, email: str, password: str) -> None:
+        """
+        비회원 정보 입력
+        
+        Args:
+            buyername: 구매자명
+            phonenumber: 전화번호
+            email: 구매자 이메일
+            password: 구매자 비밀번호
+        """
+        
+        self.fill("#xo_id_buyer_name", buyername)
+        logger.debug(f"구매자명 입력: {buyername}")
+        
+        self.fill("#xo_id_buyer_phone_number", phonenumber)
+        logger.debug(f"전화번호 입력: {phonenumber}")
+        
+        self.fill("#xo_id_buyer_email", email)
+        logger.debug(f"이메일 입력: {email}")
+        
+        self.fill("#xo_id_non_member_password", password)
+        logger.debug(f"비밀번호 입력: {password}")
+        
+        self.fill("#xo_id_non_member_password_confirm", password)
+        logger.debug(f"비밀번호 확인 입력: {password}")
+            
+    def check_agreInfoAll(self) -> None:
+        """전체동의 체크"""
+        
+        self.locator('label[for="agreeInfoAllTop"]').click()
+        logger.info("전체동의")
+        
+    def check_equalName(self) -> None:
+        """주문자 정보와 동일 체크"""
+        
+        self.locator('label[for="equal-name2"]').click()
+        logger.info("주문자 정보와 동일")
+        
     
+    def _get_address_iframe(self):
+        """
+        주소찾기 iframe을 찾아서 반환
+        
+        Returns:
+            iframe의 content_frame
+        """
+        # iframe 찾기
+        iframes = self.page.locator("iframe").all()
+        if not iframes:
+            raise Exception("주소찾기 iframe을 찾을 수 없습니다.")
+        
+        # 첫 번째 iframe으로 전환
+        iframe = iframes[0]
+        iframe_frame = iframe.content_frame()
+        if not iframe_frame:
+            raise Exception("주소찾기 iframe content를 가져올 수 없습니다.")
+        
+        return iframe_frame
+
+
+    def click_find_address(self) -> None:
+        """
+        비회원 주소찾기 버튼 클릭
+        
+        """
+        
+        self.click(".button__address-search")
+        logger.info("주소찾기 버튼")
+
+
+    def fill_address(self, address: str) -> None:
+        """
+        주소 찾기
+        
+        Args:
+            address: 주소
+        """
+        iframes = self.page.frame_locator('[title = "주소찾기"]')
+
+        iframes.locator(".input_search").fill(address)
+        logger.debug(f"주소: {address}")
+        
+        iframes.locator(".ico_search").click()
+        logger.debug("찾기 버튼")
+        
+        iframes.locator("#text_address_1_0").click()
+        logger.debug("첫번째 주소")
+        
+        iframes.locator(".btn_set").click()        
+        logger.info("주소 선택 확인")
+
+
+    
+    def fill_address2(self, address2: str, timeout: Optional[int] = None) -> None:
+        """
+        주소 찾기
+        
+        Args:
+            address2: 상세주소
+        """
+        timeout = timeout or self.timeout
+        logger.debug(f"입력주소: {address2}")        
+
+
+        self.fill('[title = "상세주소 입력"]', address2)
+        logger.debug(f"주소: {address2}") 
+        
+        
+    def fill_bank_account(self, number: str, name: str) -> None:
+        """
+        은행 계좌번호 입력
+        
+        Args:
+            number: 계좌번호
+            name: 예금주명
+        """
+        self.fill("#xo_id_refund_account_number", number)
+        logger.debug(f"계좌번호: {number}")
+            
+        self.fill("#xo_id_refund_account_owner_name", name)
+        logger.debug(f"이름: {name}")
+        
+        with self.page.expect_event("dialog") as dialog_info:
+            self.click("#xo_id_refund_account_confirm_button")
+    
+        dialog = dialog_info.value
+        dialog.accept()
+
+        logger.info("계좌확인")
+
