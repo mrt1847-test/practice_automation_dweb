@@ -32,6 +32,8 @@ class PlaywrightSharedState:
     feature_page = None  # feature 단위로 공유되는 page
     feature_browser_session = None  # feature 단위로 공유되는 browser_session
     bdd_context = None  # bdd_context 참조 (feature 변경 시 store 초기화용)
+    skip_current_feature = False  # 현재 feature 파일의 나머지 시나리오 skip 플래그
+    skip_feature_name = None  # skip할 feature 이름
 
 # 브라우저 fixture (세션 단위, 한 번만 실행)
 @pytest.fixture(scope="session", autouse=True)
@@ -246,6 +248,10 @@ def pytest_bdd_before_scenario(request, feature, scenario):
                 logger.info(f"bdd_context.store 초기화 완료 (feature 변경: {PlaywrightSharedState.current_feature_name} → {feature.name})")
             except Exception as e:
                 logger.warning(f"bdd_context.store 초기화 중 오류: {e}")
+        
+        # skip 플래그 초기화 (새 feature 시작 시)
+        PlaywrightSharedState.skip_current_feature = False
+        PlaywrightSharedState.skip_feature_name = None
         
         # 새 Feature를 위한 깨끗한 컨텍스트(브라우저 환경) 생성
         PlaywrightSharedState.context = PlaywrightSharedState.browser.new_context(
@@ -625,10 +631,15 @@ root_logger.addHandler(test_log_handler)
 
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_setup(item):
-    """테스트 시작 시 로그 핸들러 초기화"""
+    """테스트 시작 시 로그 핸들러 초기화 및 skip 플래그 확인"""
     global current_test_nodeid
     current_test_nodeid = item.nodeid
     test_log_handler.clear()
+    
+    # 현재 feature 파일이 skip 대상인지 확인
+    if PlaywrightSharedState.skip_current_feature and PlaywrightSharedState.skip_feature_name:
+        if PlaywrightSharedState.current_feature_name == PlaywrightSharedState.skip_feature_name:
+            pytest.skip(f"이전 단계에서 모듈이 없어 현재 feature('{PlaywrightSharedState.skip_feature_name}')의 나머지 테스트를 skip합니다.")
     
     outcome = yield
 

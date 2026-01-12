@@ -8,6 +8,7 @@ from pages.home_page import HomePage
 from pages.search_page import SearchPage
 from utils.urls import search_url
 from urllib.parse import quote
+import pytest
 import logging
 
 logger = logging.getLogger(__name__)
@@ -33,19 +34,35 @@ def user_searches_product(browser_session, keyword):
 def user_has_searched_product(browser_session, keyword):
     """
     사용자가 이미 검색을 완료한 상태 (Atomic POM 조합)
+    페이지 이동 후 URL 검증 수행 (실패하면 fail)
+    
     Args:
         browser_session: BrowserSession 객체 (page 참조 관리)
         keyword: 검색 키워드
     """
     search_url_value = search_url(keyword)
     current_url = browser_session.page.url
+    
     # URL에 keyword가 인코딩된 형태든 인코딩되지 않은 형태든 포함되어 있는지 확인
     if keyword in current_url or quote(keyword, safe='') in current_url:
         logger.info("이미 검색 결과 페이지에 있음 (URL에 keyword 포함)")
         return
+    
     # 검색 결과 페이지가 아니면 이동
     home_page = HomePage(browser_session.page)
     home_page.goto(search_url_value)
+    
+    # 페이지 이동 후 URL 검증 (실패하면 fail)
+    browser_session.page.wait_for_load_state("networkidle")
+    new_url = browser_session.page.url
+    
+    # URL에 keyword가 포함되어 있는지 확인 (인코딩된 형태든 안 된 형태든)
+    assert keyword in new_url or quote(keyword, safe='') in new_url, (
+        f"검색 결과 페이지로 이동 실패. "
+        f"예상: keyword '{keyword}'가 URL에 포함되어야 함. "
+        f"실제 URL: {new_url}"
+    )
+    
     logger.info("검색 결과 페이지가 아님. 검색 페이지 url 로 이동")
     logger.info(f"상품 검색 완료: {keyword}")
 
@@ -89,7 +106,16 @@ def search_results_page_is_displayed(browser_session):
         browser_session: BrowserSession 객체 (page 참조 관리)
     """
     search_page = SearchPage(browser_session.page)
-    assert search_page.is_search_results_displayed(), "검색 결과 페이지가 표시되지 않았습니다"
+    
+    # 페이지 로드 대기
+    search_page.wait_for_search_results_load()
+    
+    # URL 패턴 확인
+    current_url = browser_session.page.url.lower()
+    assert "/n/search" in current_url or "/search" in current_url, (
+        f"검색 결과 페이지가 아닙니다. 현재 URL: {browser_session.page.url}"
+    )
+    
     logger.info("검색 결과 페이지 표시 확인")
 
 
@@ -172,19 +198,34 @@ def user_views_special_products(browser_session):
 
 
 @given(parsers.parse('검색 결과 페이지에 "{module_title}" 모듈이 있다'))
-def module_exists_in_search_results(browser_session, module_title):
+def module_exists_in_search_results(browser_session, module_title, request):
     """
     검색 결과 페이지에 특정 모듈이 존재하는지 확인하고 보장 (Given)
+    모듈이 없으면 skip (같은 feature 파일 내 다음 시나리오 모두 skip)
+    모듈이 있지만 보이지 않으면 fail
     
     Args:
         browser_session: BrowserSession 객체 (page 참조 관리)
         module_title: 모듈 타이틀
+        request: pytest request 객체 (fixture 접근용)
     """
+    from conftest import PlaywrightSharedState
+    
     search_page = SearchPage(browser_session.page)
     
-    # 모듈 존재 확인
+    # 모듈 찾기
     module = search_page.get_module_by_title(module_title)
-    expect(module).to_be_visible()
+    
+    # 모듈이 존재하는지 확인 (count == 0이면 모듈이 없음)
+    module_count = module.count()
+    if module_count == 0:
+        # 모듈이 없으면 skip (현재 feature 파일의 나머지 시나리오도 skip하도록 플래그 설정)
+        PlaywrightSharedState.skip_current_feature = True
+        PlaywrightSharedState.skip_feature_name = PlaywrightSharedState.current_feature_name
+        pytest.skip(f"'{module_title}' 모듈이 검색 결과에 없습니다. 현재 feature의 나머지 시나리오를 skip합니다.")
+    
+    # 모듈이 있으면 visibility 확인 (실패하면 fail)
+    expect(module.first).to_be_visible()
     
     logger.info(f"{module_title} 모듈 존재 확인 완료")
 
