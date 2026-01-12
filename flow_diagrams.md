@@ -193,58 +193,68 @@ graph TD
 ## 4. 컴포넌트 간 의존성 다이어그램
 
 ```mermaid
+
 graph TB
-    %% ===== Style Definitions (심플한 무채색 설정) =====
-    classDef default fill:#ffffff,stroke:#000000,stroke-width:1.5px
-    classDef layer fill:#f8fafc,stroke:#000000,stroke-width:2px,font-weight:bold
-    classDef ext fill:#ffffff,stroke:#000000,stroke-width:1.5px,stroke-dasharray: 5 5
-    classDef cfg fill:#ffffff,stroke:#000000,stroke-width:1px,stroke-dasharray: 2 2
+    %% ===== Style Definitions =====
+    classDef default fill:#ffffff,stroke:#1e293b,stroke-width:1.2px
+    classDef l1 fill:#f8fafc,stroke:#94a3b8,stroke-width:0.5px,color:#64748b
+    classDef l2 fill:#f1f5f9,stroke:#64748b,stroke-width:0.5px,color:#475569
+    classDef l3 fill:#e2e8f0,stroke:#475569,stroke-width:1.5px,color:#1e293b,font-weight:bold
+    classDef l4 fill:#ffffff,stroke:#3b82f6,stroke-width:2.5px,color:#1d4ed8,font-weight:bold
+    classDef ext fill:#ffffff,stroke:#cbd5e1,stroke-dasharray: 4 4
+    classDef cfg fill:#ffffff,stroke:#e2e8f0,stroke-dasharray: 2 2,color:#94a3b8
 
     %% ===== Layers =====
-    subgraph L1["📝 L1 · 비즈니스 계층"]
-        F1(Feature Files<br/>Gherkin 시나리오)
+    subgraph L1["📝 L1 · 테스트 정의 계층"]
+        F1["Feature Files<br/>.feature (Gherkin 문법)"]
     end
 
-    subgraph L2["🔗 L2 · 행위 계층"]
-        S1(Step Definitions<br/>@given @when @then)
+    subgraph L2["🔗 L2 · BDD 실행 계층"]
+        S1["Step Definitions<br/>steps/*.py (@given, @when, @then)"]
     end
 
-    subgraph L3["🎯 L3 · 객체 계층"]
-        P1(Page Objects<br/>home_page, login_page 등)
+    subgraph L3["🎯 L3 · Page Object 계층"]
+        P1["Page Objects<br/>UI 추상화 및 액션 캡슐화"]
     end
 
-    subgraph L4["⚙️ L4 · 엔진 계층"]
-        E1(Pytest Fixtures & Hooks<br/>conftest.py)
-        E2(Playwright Shared State)
-        E1 --> E2
+    subgraph L4["⚙️ L4 · 인프라/엔진 계층"]
+        E1["Pytest Fixtures & Hooks<br/>conftest.py"]
+        E2["Playwright Shared State<br/>Browser/Context/Page 관리"]
+        E1 --- E2
     end
 
     subgraph EXT["📊 외부 시스템 연동"]
-        TR1(TestRail Session Hook)
-        TR2(TestRail API)
-        TR1 --> TR2
+        TR1["TestRail 통합 Hook"]
+        TR2["API 결과 리포터"]
+        TR1 --- TR2
     end
 
-    %% ===== Flow =====
-    L1 --> L2 --> L3 --> E2
-    L1 -.->|ID 매핑| TR1
-    E2 -.->|테스트 증적 데이터| TR1
+    %% ===== Flow (Electric Blue 강조) =====
+    L1 ==> L2 ==> L3 ==> L4
+    
+    L1 -.->|Case ID 매핑| EXT
+    L4 -.->|테스트 증적 데이터| EXT
 
     %% ===== Config =====
-    Config(Config / Utils)
-    Config -.-> S1
-    Config -.-> P1
-    Config -.-> E1
+    Config["환경 설정 (Config / Utils)"]
+    Config -.-> L2
+    Config -.-> L3
+    Config -.-> L4
 
-    %% ===== Apply Styles =====
-    style L1 fill:#ffffff,stroke:#000000,stroke-width:2px
-    style L2 fill:#ffffff,stroke:#000000,stroke-width:2px
-    style L3 fill:#ffffff,stroke:#000000,stroke-width:2px
-    style L4 fill:#ffffff,stroke:#000000,stroke-width:2px
-    style EXT fill:#ffffff,stroke:#000000,stroke-width:1.5px,stroke-dasharray: 5 5
-    
+    %% ===== Apply Area Styles =====
+    style L1 fill:#f8fafc,stroke:#f1f5f9
+    style L2 fill:#f8fafc,stroke:#f1f5f9
+    style L3 fill:#f1f5f9,stroke:#e2e8f0
+    style L4 fill:#eff6ff,stroke:#dbeafe,stroke-width:1px
+    style EXT fill:#f8fafc,stroke:#f1f5f9
+
+    %% ===== Apply Classes =====
     class F1,S1,P1,E1,E2 default
-    class TR1,TR2 ext
+    class L1 l1
+    class L2 l2
+    class L3 l3
+    class L4 l4
+    class EXT,TR1,TR2 ext
     class Config cfg
 ```
 
