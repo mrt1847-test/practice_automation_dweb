@@ -115,7 +115,7 @@ pytest --cache-clear
 ```python
 # test_features.py
 from pytest_bdd import scenarios
-scenarios("features/purchase_flow.feature")  # 특정 파일만 지정
+scenarios("features/test_001.feature")  # 특정 파일만 지정
 ```
 
 그 후 실행:
