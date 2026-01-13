@@ -333,9 +333,9 @@ def order_is_created_with_pending_payment(browser_session):
         browser_session: BrowserSession 객체 (page 참조 관리)
     """
     # browser_session.page 사용 (새 탭이 열렸다면 자동으로 새 탭을 가리킴)
-
+    actual_page = browser_session.page
     checkout_page = CheckoutPage(browser_session.page)
-    checkout_page.wait_for_load_state("networkidle")
+    actual_page.wait_for_load_state("networkidle")
     checkout_page.order_complete_check()
     checkout_page.order_complete_check_bank_transfer()
 
