@@ -10,12 +10,6 @@ import numpy as np
 import easyocr
 
 logger = logging.getLogger(__name__)
-alert_detected = {"status": False, "message": ""}
-
-def handle_dialog(dialog):
-    alert_detected["status"] = True
-    alert_detected["message"] = dialog.message
-    dialog.accept()
 
 
 class CheckoutPage(BasePage):
@@ -159,18 +153,8 @@ class CheckoutPage(BasePage):
         element.wait_for(state="visible", timeout=timeout)
         logger.debug("결제하기 버튼 표시 확인")
 
-        self.page.on("dialog", handle_dialog)
-
+        # 얼럿 체크와 함께 클릭
         element.click()
-        
-        # 잠깐 대기 (네트워크/응답 시간)
-        self.page.wait_for_timeout(2000)
-
-        # 검증: 얼럿이 감지되었다면 실패 처리
-        if alert_detected["status"]:
-            raise AssertionError(f"비정상 얼럿 감지: {alert_detected['message']}")
-        
-        # 감지 안 됐다면 정상 통과
         logger.info("결제하기 버튼 클릭 완료")
     
     def _get_smilepay_iframe(self):

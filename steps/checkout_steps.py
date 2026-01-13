@@ -232,8 +232,9 @@ def order_is_completed(browser_session):
     Args:
         browser_session: BrowserSession 객체 (page 참조 관리)
     """
+    checkout_page = CheckoutPage(browser_session.page)
     browser_session.page.wait_for_load_state("networkidle")
-    # TODO: 주문 완료 페이지 확인 로직 구현
+    checkout_page.order_complete_check()
     logger.info("주문 완료 확인")
 
 

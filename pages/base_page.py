@@ -328,4 +328,33 @@ class BasePage:
         timeout = timeout or self.timeout
         logger.debug(f"텍스트 기반 클릭: text={text}")
         self.get_by_text(text, exact=exact).click(timeout=timeout)
+    
+    def click_and_expect_dialog(self, selector: str = None, locator: Locator = None, timeout: Optional[int] = None) -> None:
+        """
+        요소를 클릭하고 얼럿이 나타나는 것을 기대하며 수락 (expect_event 방식)
+        
+        Args:
+            selector: 클릭할 요소의 선택자 (selector 또는 locator 중 하나 필수)
+            locator: 클릭할 Locator 객체 (selector 또는 locator 중 하나 필수)
+            timeout: 타임아웃 (기본값: self.timeout)
+            
+        Raises:
+            ValueError: selector와 locator 둘 다 제공되지 않은 경우
+            TimeoutError: 얼럿이 나타나지 않은 경우
+        """
+        if selector is None and locator is None:
+            raise ValueError("selector 또는 locator 중 하나를 제공해야 합니다.")
+        
+        timeout = timeout or self.timeout
+        logger.debug(f"얼럿을 기대하며 클릭")
+        
+        with self.page.expect_event("dialog", timeout=timeout) as dialog_info:
+            if locator:
+                locator.click(timeout=timeout)
+            else:
+                self.click(selector, timeout=timeout)
+        
+        dialog = dialog_info.value
+        dialog.accept()
+        logger.debug(f"얼럿 수락 완료: {dialog.message}")
 
