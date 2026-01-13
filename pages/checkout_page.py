@@ -383,13 +383,15 @@ class CheckoutPage(BasePage):
         logger.info("주소찾기 버튼 클릭 완료")
 
 
-    def fill_address(self, address: str) -> None:
+    def fill_address(self, address: str, timeout: Optional[int] = None) -> None:
         """
         주소 찾기
         
         Args:
             address: 주소
+            timeout: 타임아웃 (기본값: self.timeout)
         """
+        timeout = timeout or self.timeout
         iframes = self.page.frame_locator('[title = "주소찾기"]')
 
         iframes.locator(".input_search").fill(address)
@@ -403,6 +405,20 @@ class CheckoutPage(BasePage):
         
         iframes.locator(".btn_set").click()        
         logger.info("주소 선택 클릭 완료")
+        
+        # iframe이 닫혔는지 확인
+        try:
+            iframe_element = self.page.locator('iframe[title="주소찾기"]')
+            iframe_element.wait_for(state="hidden", timeout=timeout)
+            logger.debug("주소찾기 iframe이 닫힘을 확인")
+        except Exception:
+            # hidden 상태 대기가 실패하면 detached 상태로 시도
+            try:
+                iframe_element = self.page.locator('iframe[title="주소찾기"]')
+                iframe_element.wait_for(state="detached", timeout=timeout)
+                logger.debug("주소찾기 iframe이 DOM에서 제거됨을 확인")
+            except Exception as e:
+                logger.warning(f"iframe 닫힘 확인 실패: {e}")
 
 
     
@@ -415,7 +431,7 @@ class CheckoutPage(BasePage):
         """
         logger.debug(f"입력주소: {address}")
         # 상세주소 입력 필드가 편집 가능할 때까지 명시적으로 대기
-        detail_input = self.page.locator('[title = "상세주소 입력"]')
+        detail_input = self.page.locator('#xo_id_address_2')
         detail_input.wait_for(state="attached", timeout=timeout)
         detail_input.wait_for(state="visible", timeout=timeout)
         
@@ -426,7 +442,7 @@ class CheckoutPage(BasePage):
             # editable 상태가 지원되지 않는 경우를 대비
             pass
         
-        self.fill('[title = "상세주소 입력"]', address, timeout=timeout)
+        self.fill('#xo_id_address_2', address, timeout=timeout)
         logger.debug(f"주소: {address}")      
 
         logger.info("상세주소 입력 완료")
