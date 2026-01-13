@@ -413,12 +413,21 @@ class CheckoutPage(BasePage):
         Args:
             address: 상세주소
         """
-        timeout = timeout or self.timeout
-        logger.debug(f"입력주소: {address}")        
-
-
-        self.fill('[title = "상세주소 입력"]', address)
-        logger.debug(f"주소: {address}") 
+        logger.debug(f"입력주소: {address}")
+        # 상세주소 입력 필드가 편집 가능할 때까지 명시적으로 대기
+        detail_input = self.page.locator('[title = "상세주소 입력"]')
+        detail_input.wait_for(state="attached", timeout=timeout)
+        detail_input.wait_for(state="visible", timeout=timeout)
+        
+        # 추가 안전장치: 입력 필드가 클릭 가능하고 편집 가능한 상태까지 대기
+        try:
+            detail_input.wait_for(state="editable", timeout=timeout)
+        except Exception:
+            # editable 상태가 지원되지 않는 경우를 대비
+            pass
+        
+        self.fill('[title = "상세주소 입력"]', address, timeout=timeout)
+        logger.debug(f"주소: {address}")      
 
         logger.info("상세주소 입력 완료")
         
