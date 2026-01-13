@@ -451,3 +451,18 @@ class CheckoutPage(BasePage):
         # 에러 메시지 리스트가 비어있어야(False) 테스트 통과
         # 만약 메시지가 있다면(True) AssertionError 발생
         assert not error_messages, f"구매자 입력 정보 오류: {'//'.join(error_messages)}"
+
+
+    def order_complete_check(self) -> None:
+        """
+        주문 완료 확인
+        """
+        self.page.get_by_text("주문완료", exact=True).nth(0).wait_for(state="visible", timeout=self.timeout)
+        logger.info("주문 완료 확인 완료")
+
+    def order_complete_check_bank_transfer(self) -> None:  
+        """
+        무통장입금 주문 완료 확인
+        """
+        self.page.locator(".text__stasus-note").nth(0).wait_for(state="visible", timeout=self.timeout)
+        logger.info("무통장입금 주문 완료 확인 완료")
