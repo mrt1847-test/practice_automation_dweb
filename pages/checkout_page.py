@@ -461,12 +461,15 @@ class CheckoutPage(BasePage):
             
         self.fill("#xo_id_refund_account_owner_name", name)
         logger.debug(f"이름: {name}")
-        
-        with self.page.expect_event("dialog") as dialog_info:
-            self.click("#xo_id_refund_account_confirm_button")
+
+        self.click_and_expect_dialog("#xo_id_refund_account_confirm_button")       
+
+
+        # with self.page.expect_event("dialog") as dialog_info:
+        #     self.click("#xo_id_refund_account_confirm_button")
     
-        dialog = dialog_info.value
-        dialog.accept()
+        # dialog = dialog_info.value
+        # dialog.accept()
 
         logger.info("계좌확인 클릭 완료")
 

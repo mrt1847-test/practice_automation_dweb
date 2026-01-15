@@ -2,7 +2,7 @@
 Base Page Object 클래스
 모든 Page Object의 기본이 되는 클래스
 """
-from playwright.sync_api import Page, Locator, expect
+from playwright.sync_api import Page, Locator
 from typing import Optional
 import logging
 
@@ -329,9 +329,9 @@ class BasePage:
         logger.debug(f"텍스트 기반 클릭: text={text}")
         self.get_by_text(text, exact=exact).click(timeout=timeout)
     
-    def click_and_expect_dialog(self, selector: str = None, locator: Locator = None, timeout: Optional[int] = None) -> None:
+    def click_and_expect_dialog(self, selector: str = None, locator: Locator = None, timeout: Optional[int] = None) -> str:
         """
-        요소를 클릭하고 얼럿이 나타나는 것을 기대하며 수락 (expect_event 방식)
+        요소를 클릭하고 얼럿이 나타나는 것을 기대하며 수락 (once 방식)
         
         Args:
             selector: 클릭할 요소의 선택자 (selector 또는 locator 중 하나 필수)
@@ -347,14 +347,20 @@ class BasePage:
         
         timeout = timeout or self.timeout
         logger.debug(f"얼럿을 기대하며 클릭")
+
+        alert_detected = {"message": None}
+
+        def handle_dialog(dialog):
+            alert_detected["message"] = dialog.message
+            dialog.accept()
         
-        with self.page.expect_event("dialog", timeout=timeout) as dialog_info:
-            if locator:
-                locator.click(timeout=timeout)
-            else:
-                self.click(selector, timeout=timeout)
-        
-        dialog = dialog_info.value
-        dialog.accept()
-        logger.debug(f"얼럿 수락 완료: {dialog.message}")
+        self.page.once("dialog",handle_dialog)
+
+        if locator:
+            locator.click(timeout=timeout)
+        else:
+            self.click(selector, timeout=timeout)
+
+        logger.debug(f"얼럿 수락 완료: {alert_detected['message']}")
+        return alert_detected["message"]
 
